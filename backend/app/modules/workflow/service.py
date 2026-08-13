@@ -4,13 +4,13 @@
   await WorkflowService(db).handle(task_id, user, roles, action="PASS"/"REJECT", opinion=...)
 审批全部通过后自动回写业务状态 (BIZ_CALLBACKS)
 """
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.response import BizError
-from app.models import Enterprise, SysUser, WfDefinition, WfInstance, WfNode, WfTask
+from app.models import DeliveryWarehouse, Enterprise, SysUser, Warehouse, WfDefinition, WfInstance, WfNode, WfTask
 
 
 async def _cb_enterprise_audit(db: AsyncSession, biz_id: int, passed: bool) -> None:
@@ -21,7 +21,34 @@ async def _cb_enterprise_audit(db: AsyncSession, biz_id: int, passed: bool) -> N
             ent.coop_evaluation = "准入审批通过，初始合作评价：良好"
 
 
-BIZ_CALLBACKS = {"ENTERPRISE_AUDIT": _cb_enterprise_audit}
+async def _cb_warehouse_lease(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """仓库租赁审批 (F2.1): 通过则仓库转为已租赁"""
+    wh = await db.get(Warehouse, biz_id)
+    if wh:
+        wh.lease_status = "LEASED" if passed else "NONE"
+
+
+async def _cb_delivery_wh_create(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """交割仓建立审批 (F2.3): 通过则建立交割仓 + 库存初始化"""
+    from app.modules.inventory.service import change_inventory, get_or_create_product
+
+    dw = await db.get(DeliveryWarehouse, biz_id)
+    if not dw:
+        return
+    if not passed:
+        dw.status = "REJECTED"
+        return
+    dw.status = "IN_STOCK"
+    dw.inbound_date = date.today()
+    product = await get_or_create_product(db, dw.grade, dw.spec)
+    await change_inventory(db, dw.warehouse_id, product.id, dw.quantity, "INIT", biz_id=dw.id)
+
+
+BIZ_CALLBACKS = {
+    "ENTERPRISE_AUDIT": _cb_enterprise_audit,
+    "WAREHOUSE_LEASE": _cb_warehouse_lease,
+    "DELIVERY_WH_CREATE": _cb_delivery_wh_create,
+}
 
 
 class WorkflowService:

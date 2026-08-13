@@ -198,3 +198,95 @@ class SysConfig(Base):
     config_value: Mapped[str] = mapped_column(String(255))
     remark: Mapped[str | None] = mapped_column(String(255))
     updated_time: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# ---------------- 仓储与库存 (M2) ----------------
+
+class Warehouse(Base, TimestampMixin):
+    __tablename__ = "warehouse"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100))
+    enterprise_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("enterprise.id"))
+    address: Mapped[str] = mapped_column(String(255))
+    capacity: Mapped[int | None] = mapped_column(Integer)
+    rent_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    lease_status: Mapped[str] = mapped_column(String(10), default="NONE")  # NONE/WAIT/LEASED
+    monitor_online: Mapped[bool] = mapped_column(Boolean, default=False)
+    point_map_file_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class EggProduction(Base):
+    __tablename__ = "egg_production"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    enterprise_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("enterprise.id"))
+    prod_date: Mapped[date] = mapped_column(Date)
+    quantity: Mapped[int] = mapped_column(Integer)
+    grade: Mapped[str] = mapped_column(String(20))
+    spec: Mapped[str] = mapped_column(String(20))
+    created_time: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class DeliveryWarehouse(Base, TimestampMixin):
+    __tablename__ = "delivery_warehouse"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    dw_no: Mapped[str] = mapped_column(String(32), unique=True)
+    warehouse_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("warehouse.id"))
+    enterprise_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("enterprise.id"))
+    quantity: Mapped[int] = mapped_column(Integer)
+    grade: Mapped[str] = mapped_column(String(20))
+    spec: Mapped[str] = mapped_column(String(20))
+    inbound_date: Mapped[date | None] = mapped_column(Date)
+    turnover_days: Mapped[int] = mapped_column(Integer, default=3)
+    # AUDITING审批中/IN_STOCK在库/APPLYING已申请销售/SOLD已售/CLOSED已平仓/RETURNED已退仓/REJECTED审批驳回
+    status: Mapped[str] = mapped_column(String(20), default="AUDITING")
+
+
+class Product(Base, TimestampMixin):
+    __tablename__ = "product"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    product_name: Mapped[str] = mapped_column(String(100), default="鸡蛋")
+    category: Mapped[str | None] = mapped_column(String(50))
+    grade: Mapped[str] = mapped_column(String(20))
+    spec: Mapped[str] = mapped_column(String(20))
+    unit: Mapped[str] = mapped_column(String(10), default="件")
+    price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+
+
+class Inventory(Base):
+    __tablename__ = "inventory"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("warehouse.id"))
+    product_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("product.id"))
+    quantity: Mapped[int] = mapped_column(Integer, default=0)
+    locked_qty: Mapped[int] = mapped_column(Integer, default=0)
+    version: Mapped[int] = mapped_column(Integer, default=0)
+    updated_time: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class InventoryLog(Base):
+    __tablename__ = "inventory_log"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(BigInteger)
+    product_id: Mapped[int] = mapped_column(BigInteger)
+    change_qty: Mapped[int] = mapped_column(Integer)
+    before_qty: Mapped[int] = mapped_column(Integer)
+    after_qty: Mapped[int] = mapped_column(Integer)
+    biz_type: Mapped[str] = mapped_column(String(30))
+    biz_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_time: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class IotDevice(Base, TimestampMixin):
+    __tablename__ = "iot_device"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("warehouse.id"))
+    device_name: Mapped[str | None] = mapped_column(String(100))
+    device_type: Mapped[str] = mapped_column(String(30), default="CAMERA")
+    protocol: Mapped[str] = mapped_column(String(20), default="RTSP")
+    stream_url: Mapped[str | None] = mapped_column(String(500))
+    online: Mapped[bool] = mapped_column(Boolean, default=False)
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=False)

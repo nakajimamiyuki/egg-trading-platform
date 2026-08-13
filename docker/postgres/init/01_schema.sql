@@ -242,9 +242,9 @@ CREATE TABLE delivery_warehouse (
     quantity         INT          NOT NULL,          -- 初始入库数量
     grade            VARCHAR(20)  NOT NULL,
     spec             VARCHAR(20)  NOT NULL,
-    inbound_date     DATE         NOT NULL,
-    turnover_days    INT          NOT NULL DEFAULT 3,      -- 周转天数(预警用, F7.1)
-    status           VARCHAR(20)  NOT NULL DEFAULT 'IN_STOCK', -- IN_STOCK在库/APPLYING已申请销售/SOLD已售/CLOSED已平仓/RETURNED已退仓
+    inbound_date     DATE,                                   -- 审批通过建仓时写入
+    turnover_days    INT          NOT NULL DEFAULT 3,        -- 周转天数(预警用, F7.1)
+    status           VARCHAR(20)  NOT NULL DEFAULT 'AUDITING', -- AUDITING审批中/IN_STOCK在库/APPLYING/SOLD/CLOSED/RETURNED/REJECTED
     created_time     TIMESTAMP    NOT NULL DEFAULT now(),
     updated_time     TIMESTAMP    NOT NULL DEFAULT now(),
     deleted          BOOLEAN      NOT NULL DEFAULT FALSE
