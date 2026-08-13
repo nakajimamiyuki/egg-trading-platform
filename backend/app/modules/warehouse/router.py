@@ -114,9 +114,8 @@ async def dw_apply(req: DwApply, ctx=Depends(require_roles("BUSINESS")), db: Asy
     if not wh.monitor_online:
         raise BizError("仓库监控未接入确权 (F2.2), 不能建交割仓")
 
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(DeliveryWarehouse).where(DeliveryWarehouse.dw_no.like(f"DW{today}%")))
-    dw_no = f"DW{today}{count + 1:04d}"
+    from app.core.docno import next_doc_no
+    dw_no = await next_doc_no(db, "DW")
     turnover_days = await get_config_int(db, "turnover_days", 3)
 
     dw = DeliveryWarehouse(dw_no=dw_no, warehouse_id=wh.id, enterprise_id=wh.enterprise_id,

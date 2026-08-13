@@ -16,9 +16,8 @@ from app.modules.order.service import transition
 
 
 async def _pay_no(db: AsyncSession) -> str:
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(PayRecord).where(PayRecord.pay_no.like(f"PAY{today}%")))
-    return f"PAY{today}{count + 1:04d}"
+    from app.core.docno import next_doc_no
+    return await next_doc_no(db, "PAY")
 
 
 async def _record(db: AsyncSession, order: OrderInfo, direction: str, pay_type: str, amount: Decimal,
@@ -37,20 +36,24 @@ async def _update_bill(db: AsyncSession, order: OrderInfo, direction: str, amoun
     for ent_id, field in [(order.buyer_id, "paid"), (order.seller_id, "received")]:
         bill = await db.scalar(select(FinanceBill).where(FinanceBill.order_id == order.id, FinanceBill.enterprise_id == ent_id))
         if not bill:
-            today = date.today().strftime("%Y%m%d")
-            count = await db.scalar(select(func.count()).select_from(FinanceBill))
-            bill = FinanceBill(bill_no=f"BILL{today}{count + 1:04d}", order_id=order.id,
+            from app.core.docno import next_doc_no
+            bill = FinanceBill(bill_no=await next_doc_no(db, "BILL"), order_id=order.id,
                                enterprise_id=ent_id, amount=order.total_amount)
             db.add(bill)
             await db.flush()
         setattr(bill, field, getattr(bill, field) + amount)
 
 
-async def buyer_pay(db: AsyncSession, order: OrderInfo, pay_type: str, user) -> PayRecord:
-    """客户付款(模拟通道): DEPOSIT 定金20% / TAIL 尾款80%"""
+async def buyer_pay(db: AsyncSession, order_id: int, pay_type: str, user) -> PayRecord:
+    """客户付款(模拟通道): DEPOSIT 定金20% / TAIL 尾款80%
+    行级锁防止并发重复支付"""
     from app.modules.inventory.service import lock_inventory
     from app.modules.workflow.service import WorkflowService
 
+    # FOR UPDATE 锁订单行: 并发支付请求串行化, 第二个进来时状态已变, 必然校验失败
+    order = await db.scalar(select(OrderInfo).where(OrderInfo.id == order_id).with_for_update())
+    if not order:
+        raise BizError("订单不存在", code=404)
     if order.buyer_id != user.enterprise_id:
         raise BizError("只能支付本企业订单", code=403)
 
@@ -162,9 +165,8 @@ async def confirm_manual_payment(db: AsyncSession, record_id: int, voucher_file_
 
 async def _generate_voucher(db: AsyncSession, order: OrderInfo) -> PickupVoucher:
     """电子提货凭证 (F5.3): 养殖户收齐全款后生成, 扫码放行唯一凭证"""
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(PickupVoucher))
-    voucher_no = f"PV{today}{count + 1:04d}"
+    from app.core.docno import next_doc_no
+    voucher_no = await next_doc_no(db, "PV")
     sign = hashlib.sha256(f"{voucher_no}{settings.JWT_SECRET}".encode()).hexdigest()[:16].upper()
     item = await db.scalar(select(OrderItem).where(OrderItem.order_id == order.id))
     outbound_id = None

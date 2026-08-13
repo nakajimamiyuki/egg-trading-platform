@@ -92,10 +92,9 @@ async def force_close(db: AsyncSession, dw_id: int, operator_id: int) -> CloseOr
     ratio = await get_config_decimal(db, "close_discount_ratio", "0.80")
     original = (Decimal(dw.quantity) * (dw.price or Decimal("0"))).quantize(Decimal("0.01"))
     settle = (original * ratio).quantize(Decimal("0.01"))
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(CloseOrder))
+    from app.core.docno import next_doc_no
     co = CloseOrder(
-        close_no=f"PC{today}{count + 1:04d}", delivery_warehouse_id=dw_id, close_type="FORCE",
+        close_no=await next_doc_no(db, "PC"), delivery_warehouse_id=dw_id, close_type="FORCE",
         discount_ratio=ratio, quantity=dw.quantity, original_amount=original, settle_amount=settle,
         profit_loss=original - settle, created_by=operator_id,
     )
@@ -108,6 +107,7 @@ async def force_close(db: AsyncSession, dw_id: int, operator_id: int) -> CloseOr
 
 async def on_close_refund_approved(db: AsyncSession, close_order_id: int) -> None:
     """平仓退款审批通过 (F7.4): 退款给养殖户 + 滞销品出库 + 台账核算"""
+    from app.core.docno import next_doc_no
     from app.modules.inventory.service import change_inventory, get_or_create_product
     from app.modules.message.router import notify_enterprise
 
@@ -118,9 +118,7 @@ async def on_close_refund_approved(db: AsyncSession, close_order_id: int) -> Non
     co.status = "CONFIRMED"
     # 退款流水 (人工/直联通道沿用 finance 的设计, 此处直接记账)
     from app.models import PayRecord
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(PayRecord))
-    db.add(PayRecord(pay_no=f"PAY{today}{count + 1:04d}", order_id=None, direction="OUT", pay_type="REFUND",
+    db.add(PayRecord(pay_no=await next_doc_no(db, "PAY"), order_id=None, direction="OUT", pay_type="REFUND",
                      amount=co.settle_amount, payer_id=None, payee_id=dw.enterprise_id,
                      channel="MOCK", status="SUCCESS", paid_time=datetime.now()))
     # 滞销品出库

@@ -1,4 +1,4 @@
-"""应用启动引导: 创建初始管理员 + 种子审批流定义 + MinIO bucket"""
+"""应用启动引导: 种子数据(幂等) + 初始管理员 + 审批流定义 + MinIO bucket"""
 import logging
 
 from sqlalchemy import select
@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.security import hash_password
 from app.database.session import async_session
-from app.models import SysRole, SysUser, SysUserRole, WfDefinition, WfNode
+from app.models import SysConfig, SysDictItem, SysDictType, SysRole, SysUser, SysUserRole, WfDefinition, WfNode
 from app.modules.file.service import ensure_bucket
 
 logger = logging.getLogger(__name__)
@@ -26,16 +26,55 @@ WF_SEEDS = [
     ("INVOICE_AUDIT", "发票审批", "INVOICE_AUDIT", [("财务审批", 1, "FINANCE")]),
 ]
 
+ROLE_SEEDS = [
+    ("FARM", "养殖企业", "养殖端"), ("CUSTOMER", "客户", "采购客户端"),
+    ("BUSINESS", "业务人员", "业务端"), ("FINANCE", "财务人员", "财务端"), ("ADMIN", "管理员", "管理后台"),
+]
+
+CONFIG_SEEDS = [
+    ("deposit_ratio", "0.20", "客户定金比例"),
+    ("advance_ratio", "0.80", "平台垫资比例"),
+    ("turnover_days", "3", "交割仓周转预警天数"),
+    ("close_discount_ratio", "0.80", "超期强制平仓折价比例(按80%计价)"),
+    ("platform_profit_per_unit", "1.00", "模式③渠道账期平台分利(元/件)"),
+    ("bank_channel", "MOCK", "付款通道: MOCK自动/MANUAL人工回单"),
+]
+
+DICT_SEEDS = {
+    "EGG_GRADE": ("鸡蛋品级", [("A", "A级"), ("B", "B级"), ("C", "C级")]),
+    "EGG_SPEC": ("鸡蛋规格", [("S50", "50kg/件"), ("S45", "45kg/件"), ("S40", "40kg/件")]),
+}
+
 
 async def bootstrap() -> None:
     async with async_session() as db:
-        # 0. 平台运营方企业(合同甲方)
+        # 单据编号序列(测试库等无SQL初始化脚本的环境)
+        from sqlalchemy import text
+        await db.execute(text("CREATE SEQUENCE IF NOT EXISTS doc_seq START 1"))
+
+        # 0. 角色/字典/配置种子(幂等, 供无 SQL 初始化脚本的环境使用, 如测试库)
+        for code, name, remark in ROLE_SEEDS:
+            if not await db.scalar(select(SysRole).where(SysRole.code == code)):
+                db.add(SysRole(code=code, name=name, remark=remark))
+        for key, value, remark in CONFIG_SEEDS:
+            if not await db.scalar(select(SysConfig).where(SysConfig.config_key == key)):
+                db.add(SysConfig(config_key=key, config_value=value, remark=remark))
+        for type_code, (type_name, items) in DICT_SEEDS.items():
+            dtype = await db.scalar(select(SysDictType).where(SysDictType.code == type_code))
+            if not dtype:
+                dtype = SysDictType(code=type_code, name=type_name)
+                db.add(dtype)
+                await db.flush()
+                for sort, (code, name) in enumerate(items, start=1):
+                    db.add(SysDictItem(type_id=dtype.id, code=code, name=name, sort=sort))
+
+        # 1. 平台运营方企业(合同甲方)
         from app.models import Enterprise
         platform = await db.scalar(select(Enterprise).where(Enterprise.type == "PLATFORM"))
         if not platform:
             db.add(Enterprise(enterprise_name="蛋品交易平台运营方", type="PLATFORM", audit_status="PASS"))
 
-        # 1. 初始管理员
+        # 2. 初始管理员
         admin = await db.scalar(select(SysUser).where(SysUser.username == settings.ADMIN_USERNAME))
         if not admin:
             admin = SysUser(

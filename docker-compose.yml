@@ -96,8 +96,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # 开发期挂载源码, uvicorn --reload 热更新
-      - ./backend/app:/app/app
+      # 开发期挂载整个 backend, uvicorn --reload 热更新, tests 同步可见
+      - ./backend:/app
     depends_on:
       postgres:
         condition: service_healthy

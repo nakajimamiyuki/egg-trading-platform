@@ -19,10 +19,9 @@ async def create_outbound(db: AsyncSession, order: OrderInfo, plate_no: str, dri
         raise BizError("该订单已有出库单")
     item = await db.scalar(select(OrderItem).where(OrderItem.order_id == order.id))
     dw = await db.get(DeliveryWarehouse, item.delivery_warehouse_id)
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(OutboundOrder))
+    from app.core.docno import next_doc_no
     ob = OutboundOrder(
-        outbound_no=f"OB{today}{count + 1:04d}", order_id=order.id, warehouse_id=dw.warehouse_id,
+        outbound_no=await next_doc_no(db, "OB"), order_id=order.id, warehouse_id=dw.warehouse_id,
         quantity=order.quantity, grade=item.grade, spec=item.spec, unit_price=order.unit_price,
         plate_no=plate_no, driver_name=driver_name, driver_phone=driver_phone, created_by=operator_id,
     )
@@ -54,8 +53,8 @@ async def confirm_outbound(db: AsyncSession, outbound: OutboundOrder, side: str,
 
 
 async def verify_voucher(db: AsyncSession, qr_payload: str, user) -> PickupVoucher:
-    """扫码核销放行 (F5.3) —— 唯一放行凭证, 幂等 + 校验养殖户身份"""
-    voucher = await db.scalar(select(PickupVoucher).where(PickupVoucher.qr_payload == qr_payload))
+    """扫码核销放行 (F5.3) —— 唯一放行凭证, 行级锁+状态校验保证幂等"""
+    voucher = await db.scalar(select(PickupVoucher).where(PickupVoucher.qr_payload == qr_payload).with_for_update())
     if not voucher or voucher.deleted:
         raise BizError("提货凭证无效", code=404)
     if voucher.status == "USED":

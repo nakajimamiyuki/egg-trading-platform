@@ -21,10 +21,7 @@ class PayRequest(BaseModel):
 async def mock_pay(req: PayRequest, ctx=Depends(require_roles("CUSTOMER")), db: AsyncSession = Depends(get_db)):
     """客户付款 (模拟支付通道; 真实支付上线时切换 channel)"""
     user, _ = ctx
-    order = await db.get(OrderInfo, req.order_id)
-    if not order or order.deleted:
-        raise BizError("订单不存在", code=404)
-    rec = await finance_service.buyer_pay(db, order, req.pay_type, user)
+    rec = await finance_service.buyer_pay(db, req.order_id, req.pay_type, user)
     await db.commit()
     return ok({"pay_no": rec.pay_no, "amount": float(rec.amount)}, message=f"支付成功 ¥{rec.amount}")
 

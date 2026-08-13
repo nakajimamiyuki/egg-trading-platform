@@ -34,9 +34,8 @@ async def transition(db: AsyncSession, order: OrderInfo, to: str, operator_id: i
 
 
 async def _next_no(db: AsyncSession, prefix: str) -> str:
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(OrderInfo).where(OrderInfo.order_no.like(f"{prefix}{today}%")))
-    return f"{prefix}{today}{count + 1:04d}"
+    from app.core.docno import next_doc_no
+    return await next_doc_no(db, prefix)
 
 
 async def create_purchase_order(
@@ -46,7 +45,7 @@ async def create_purchase_order(
     """客户端建单采购 (F4.2): 校验货架 -> 计算金额 -> 创建订单 -> 发起业务审核"""
     from app.modules.workflow.service import WorkflowService
 
-    shelf = await db.get(ShelfItem, shelf_item_id)
+    shelf = await db.get(ShelfItem, shelf_item_id, with_for_update=True)  # 行锁防并发超卖
     if not shelf or shelf.deleted or shelf.status != "ON":
         raise BizError("货架商品不存在或已下架")
     if quantity <= 0 or quantity > shelf.quantity:

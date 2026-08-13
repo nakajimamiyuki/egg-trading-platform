@@ -32,9 +32,8 @@ async def apply(db: AsyncSession, order: OrderInfo, buyer_title: str, tax_no: st
 
 async def issue(db: AsyncSession, invoice: Invoice) -> None:
     """审批通过后开具 (当前为模拟开具, 接入服务商后替换)"""
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(Invoice).where(Invoice.invoice_no.isnot(None)))
-    invoice.invoice_no = f"INV{today}{count + 1:04d}"
+    from app.core.docno import next_doc_no
+    invoice.invoice_no = await next_doc_no(db, "INV")
     invoice.status = "ISSUED"
 
 

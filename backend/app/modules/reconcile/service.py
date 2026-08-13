@@ -22,9 +22,8 @@ async def run_batch(db: AsyncSession, scope: str, period_start: date, period_end
         OrderInfo.status.notin_(["CREATE", "AUDIT", "CANCEL"]),
     ))).all()
 
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(ReconcileBatch))
-    batch = ReconcileBatch(batch_no=f"REC{today}{count + 1:04d}", scope=scope,
+    from app.core.docno import next_doc_no
+    batch = ReconcileBatch(batch_no=await next_doc_no(db, "REC"), scope=scope,
                            period_start=period_start, period_end=period_end, total_count=len(orders))
     db.add(batch)
     await db.flush()

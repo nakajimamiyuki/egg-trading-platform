@@ -43,9 +43,8 @@ MODE_TEXT = {"M1": "模式①蛋库出库标准", "M2": "模式②在途货物�
 
 
 async def _next_no(db: AsyncSession) -> str:
-    today = date.today().strftime("%Y%m%d")
-    count = await db.scalar(select(func.count()).select_from(Contract))
-    return f"HT{today}{count + 1:04d}"
+    from app.core.docno import next_doc_no
+    return await next_doc_no(db, "HT")
 
 
 async def _platform(db: AsyncSession) -> Enterprise:
