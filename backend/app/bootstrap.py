@@ -22,6 +22,7 @@ WF_SEEDS = [
     ("PAYMENT_80", "交割仓付款审批(80%垫资)", "PAYMENT_80", [("财务审批", 1, "FINANCE")]),
     ("PAYMENT_20", "交割仓尾款审批(20%结算)", "PAYMENT_20", [("财务审批", 1, "FINANCE")]),
     ("CLOSE_REFUND", "平仓退款审批", "CLOSE_REFUND", [("财务审批", 1, "FINANCE")]),
+    ("CLOSE_APPLY", "养殖端平仓申请审批", "CLOSE_APPLY", [("业务审批", 1, "BUSINESS")]),
     ("INVOICE_AUDIT", "发票审批", "INVOICE_AUDIT", [("财务审批", 1, "FINANCE")]),
 ]
 

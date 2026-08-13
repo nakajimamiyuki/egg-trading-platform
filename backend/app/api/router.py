@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.modules.auth.router import router as auth_router
 from app.modules.contract.router import router as contract_router
+from app.modules.dashboard.router import router as dashboard_router
 from app.modules.delivery.router import router as delivery_router
 from app.modules.dict.router import router as dict_router
 from app.modules.enterprise.router import router as enterprise_router
@@ -10,9 +11,13 @@ from app.modules.finance.router import router as finance_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.invoice.router import router as invoice_router
 from app.modules.iot.router import router as iot_router
+from app.modules.incentive.router import router as incentive_router
+from app.modules.logistics.router import router as logistics_router
 from app.modules.message.router import router as message_router
 from app.modules.order.router import router as order_router
 from app.modules.production.router import router as production_router
+from app.modules.reconcile.router import router as reconcile_router
+from app.modules.risk.router import router as risk_router
 from app.modules.shelf.router import router as shelf_router
 from app.modules.warehouse.router import router as warehouse_router
 from app.modules.workflow.router import router as workflow_router
@@ -34,3 +39,8 @@ api_router.include_router(finance_router, prefix="/finance", tags=["资金结算
 api_router.include_router(delivery_router, prefix="/delivery", tags=["提货交付"])
 api_router.include_router(contract_router, prefix="/contract", tags=["电子合同"])
 api_router.include_router(invoice_router, prefix="/invoice", tags=["电子发票"])
+api_router.include_router(risk_router, prefix="/risk", tags=["平仓风控"])
+api_router.include_router(reconcile_router, prefix="/reconcile", tags=["对账中心"])
+api_router.include_router(dashboard_router, prefix="/dashboard", tags=["数据看板"])
+api_router.include_router(logistics_router, prefix="/logistics", tags=["物流"])
+api_router.include_router(incentive_router, prefix="/incentive", tags=["激励"])

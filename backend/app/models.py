@@ -361,7 +361,7 @@ class PayRecord(Base, TimestampMixin):
     __tablename__ = "pay_record"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     pay_no: Mapped[str] = mapped_column(String(32), unique=True)
-    order_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("order_info.id"))
+    order_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("order_info.id"))  # 平仓退款等无订单场景为空
     direction: Mapped[str] = mapped_column(String(10))  # IN/OUT
     pay_type: Mapped[str] = mapped_column(String(20))   # DEPOSIT/TAIL/ADVANCE/SETTLE/REFUND/CHANNEL_PAY
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
@@ -464,3 +464,104 @@ class Invoice(Base, TimestampMixin):
     tax_no: Mapped[str | None] = mapped_column(String(30))
     status: Mapped[str] = mapped_column(String(20), default="APPLY")  # APPLY/AUDITING/ISSUED/ARCHIVED
     file_id: Mapped[int | None] = mapped_column(BigInteger)
+
+
+# ---------------- 风控平仓 / 对账 / 物流 / 激励 (M5) ----------------
+
+class RiskSurvey(Base, TimestampMixin):
+    __tablename__ = "risk_survey"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    enterprise_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("enterprise.id"))
+    report_file_id: Mapped[int | None] = mapped_column(BigInteger)
+    conclusion: Mapped[str] = mapped_column(String(10), default="WAIT")  # WAIT/PASS/REJECT
+    remark: Mapped[str | None] = mapped_column(String(500))
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class CloseApply(Base, TimestampMixin):
+    __tablename__ = "close_apply"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    delivery_warehouse_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("delivery_warehouse.id"))
+    apply_type: Mapped[str] = mapped_column(String(30))  # RETURN/SELF_SALE_DESIGNATED/SELF_SALE_OPEN/SALE_TO_PLATFORM/OVERDUE_HANDLE
+    status: Mapped[str] = mapped_column(String(20), default="WAIT")  # WAIT/PASS/REJECT/DONE
+    remark: Mapped[str | None] = mapped_column(String(500))
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class CloseOrder(Base, TimestampMixin):
+    __tablename__ = "close_order"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    close_no: Mapped[str] = mapped_column(String(32), unique=True)
+    delivery_warehouse_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("delivery_warehouse.id"))
+    close_type: Mapped[str] = mapped_column(String(20))  # FORCE/APPLY
+    discount_ratio: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=Decimal("0.80"))
+    quantity: Mapped[int] = mapped_column(Integer)
+    original_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    settle_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    profit_loss: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    status: Mapped[str] = mapped_column(String(20), default="PENDING")  # PENDING/CONFIRMED/REFUNDED
+    created_by: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class ReconcileBatch(Base, TimestampMixin):
+    __tablename__ = "reconcile_batch"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    batch_no: Mapped[str] = mapped_column(String(32), unique=True)
+    scope: Mapped[str] = mapped_column(String(20))  # DELIVERY/SELF
+    period_start: Mapped[date] = mapped_column(Date)
+    period_end: Mapped[date] = mapped_column(Date)
+    total_count: Mapped[int] = mapped_column(Integer, default=0)
+    matched: Mapped[int] = mapped_column(Integer, default=0)
+    diff_count: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(20), default="RUNNING")
+
+
+class ReconcileDiff(Base):
+    __tablename__ = "reconcile_diff"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    batch_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("reconcile_batch.id"))
+    biz_type: Mapped[str] = mapped_column(String(30))
+    biz_id: Mapped[int] = mapped_column(BigInteger)
+    diff_desc: Mapped[str] = mapped_column(String(500))
+    adjust_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    adjust_reason: Mapped[str | None] = mapped_column(String(500))
+    adjusted_by: Mapped[int | None] = mapped_column(BigInteger)
+    adjusted_time: Mapped[datetime | None] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(String(20), default="OPEN")
+    created_time: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class LogisticsOrder(Base, TimestampMixin):
+    __tablename__ = "logistics_order"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    order_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("order_info.id"))
+    platform: Mapped[str] = mapped_column(String(20), default="MANUAL")  # YMM/MANUAL
+    waybill_no: Mapped[str | None] = mapped_column(String(64))
+    driver_name: Mapped[str | None] = mapped_column(String(50))
+    driver_phone: Mapped[str | None] = mapped_column(String(20))
+    plate_no: Mapped[str | None] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20), default="CALLED")
+
+
+class LogisticsTrack(Base):
+    __tablename__ = "logistics_track"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    logistics_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("logistics_order.id"))
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+    address: Mapped[str | None] = mapped_column(String(255))
+    track_time: Mapped[datetime] = mapped_column(DateTime)
+    created_time: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class IncentiveRecord(Base, TimestampMixin):
+    __tablename__ = "incentive_record"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    enterprise_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("enterprise.id"))
+    rule_desc: Mapped[str] = mapped_column(String(255), default="合作满6个月且发货量达每满10万只鸡规模")
+    coop_months: Mapped[int] = mapped_column(Integer, default=0)
+    chicken_scale: Mapped[int] = mapped_column(Integer, default=0)
+    qualified: Mapped[bool] = mapped_column(Boolean, default=False)
+    promise_file_id: Mapped[int | None] = mapped_column(BigInteger)
+    status: Mapped[str] = mapped_column(String(20), default="TRACKING")  # TRACKING/QUALIFIED/GRANTED

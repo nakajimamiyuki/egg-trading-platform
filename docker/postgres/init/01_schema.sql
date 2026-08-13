@@ -390,7 +390,7 @@ CREATE TABLE order_event (
 CREATE TABLE pay_record (
     id            BIGSERIAL PRIMARY KEY,
     pay_no        VARCHAR(32)  NOT NULL UNIQUE,
-    order_id      BIGINT       NOT NULL REFERENCES order_info(id),
+    order_id      BIGINT       REFERENCES order_info(id),  -- 平仓退款等无订单场景为空
     direction     VARCHAR(10)  NOT NULL,   -- IN收款(客户->平台) / OUT付款(平台->养殖户/退款)
     pay_type      VARCHAR(20)  NOT NULL,   -- DEPOSIT定金/TAIL尾款/ADVANCE垫资80%/SETTLE尾款20%/REFUND退款/CHANNEL_PAY渠道回款
     amount        NUMERIC(14,2) NOT NULL,

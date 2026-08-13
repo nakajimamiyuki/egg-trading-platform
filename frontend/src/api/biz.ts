@@ -90,3 +90,35 @@ export const checkInvoice = (invoiceNo: string) => request.get(`/invoice/check/$
 
 export const confirmManualPay = (recordId: number, voucherFileId: number) =>
   request.post(`/finance/records/${recordId}/confirm-manual`, { voucher_file_id: voucherFileId })
+
+// ---------- M5: 风控 / 对账 / 看板 / 物流 / 激励 ----------
+export const checkWarnings = () => request.post('/risk/check-warnings')
+export const createCloseApply = (data: { delivery_warehouse_id: number; apply_type: string; remark: string }) =>
+  request.post('/risk/apply', data)
+export const getCloseApplies = () => request.get('/risk/apply/list')
+export const forceClose = (dwId: number) => request.post(`/risk/force-close/${dwId}`)
+export const getCloseList = () => request.get('/risk/close/list')
+export const createSurvey = (data: { enterprise_id: number; conclusion: string; remark: string; report_file_id?: number }) =>
+  request.post('/risk/survey', data)
+export const getSurveyList = () => request.get('/risk/survey/list')
+
+export const runReconcile = (data: { scope: string; period_start: string; period_end: string }) =>
+  request.post('/reconcile/run', data)
+export const getReconcileBatches = () => request.get('/reconcile/batches')
+export const getReconcileDiffs = (batchId: number) => request.get('/reconcile/diffs', { params: { batch_id: batchId } })
+export const adjustDiff = (diffId: number, amount: number, reason: string) =>
+  request.post(`/reconcile/diffs/${diffId}/adjust`, { amount, reason })
+export const archiveReconcileBatch = (batchId: number) => request.post(`/reconcile/batches/${batchId}/archive`)
+
+export const getDashboardSummary = () => request.get('/dashboard/summary')
+export const exportReport = () => request.get('/dashboard/export', { responseType: 'blob' })
+
+export const createLogistics = (data: { order_id: number; waybill_no: string; driver_name: string; driver_phone: string; plate_no: string }) =>
+  request.post('/logistics/create', data)
+export const getLogisticsByOrder = (orderId: number) => request.get(`/logistics/by-order/${orderId}`)
+export const addTrack = (logisticsId: number, address: string) =>
+  request.post(`/logistics/${logisticsId}/track`, { address })
+
+export const getIncentiveList = () => request.get('/incentive/list')
+export const grantIncentive = (enterpriseId: number, promiseFileId?: number) =>
+  request.post('/incentive/grant', { enterprise_id: enterpriseId, promise_file_id: promiseFileId })

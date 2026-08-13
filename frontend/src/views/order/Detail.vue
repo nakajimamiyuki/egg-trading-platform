@@ -100,6 +100,32 @@
       </el-table>
     </el-card>
 
+    <!-- 物流 (模式②/③ 在途追踪) -->
+    <el-card v-if="logistics || (isBusiness && order.status !== 'CANCEL')" class="mt">
+      <template #header>
+        <div class="head">
+          <span>物流跟踪</span>
+          <el-button v-if="isBusiness && !logistics" size="small" type="primary" @click="showLogistics = true">登记运单(叫车)</el-button>
+        </div>
+      </template>
+      <template v-if="logistics">
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="运单号">{{ logistics.waybill_no || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="司机">{{ logistics.driver_name }} {{ logistics.driver_phone }}</el-descriptions-item>
+          <el-descriptions-item label="车牌">{{ logistics.plate_no }}</el-descriptions-item>
+        </el-descriptions>
+        <el-timeline style="margin-top: 12px">
+          <el-timeline-item v-for="t in logistics.tracks" :key="t.track_time"
+            :timestamp="t.track_time.slice(0, 16).replace('T', ' ')">{{ t.address }}</el-timeline-item>
+        </el-timeline>
+        <div v-if="isBusiness" class="scan-box">
+          <el-input v-model="trackInput" placeholder="录入轨迹点, 如: 到达郑州中转站" style="width: 320px" />
+          <el-button @click="onTrack">更新轨迹</el-button>
+        </div>
+      </template>
+      <span v-else class="tip">暂无物流信息（模式①客户自提可不出运单）</span>
+    </el-card>
+
     <!-- 状态时间线 -->
     <el-card class="mt">
       <template #header>流转记录</template>
@@ -123,6 +149,19 @@
         <el-button type="primary" @click="onCreateOutbound">开具</el-button>
       </template>
     </el-dialog>
+    <!-- 登记运单对话框 -->
+    <el-dialog v-model="showLogistics" title="登记运单（运满满端口就绪前人工录入）" width="460px">
+      <el-form label-width="90px">
+        <el-form-item label="运单号"><el-input v-model="waybillNo" /></el-form-item>
+        <el-form-item label="车牌号" required><el-input v-model="obForm.plate_no" /></el-form-item>
+        <el-form-item label="司机姓名" required><el-input v-model="obForm.driver_name" /></el-form-item>
+        <el-form-item label="司机电话" required><el-input v-model="obForm.driver_phone" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showLogistics = false">取消</el-button>
+        <el-button type="primary" @click="onCreateLogistics">登记</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -132,8 +171,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import QrcodeVue from 'qrcode.vue'
 import {
-  addOutboundFile, cancelOrder, confirmOutbound, createOutbound, getOrderDetail,
-  getOutboundByOrder, getPayRecords, getVoucher, pay, uploadFile, verifyVoucher
+  addOutboundFile, addTrack, cancelOrder, confirmOutbound, createLogistics, createOutbound,
+  getLogisticsByOrder, getOrderDetail, getOutboundByOrder, getPayRecords, getVoucher,
+  pay, uploadFile, verifyVoucher
 } from '../../api/biz'
 import { useUserStore } from '../../store/user'
 
@@ -146,6 +186,9 @@ const outbound = ref<any>(null)
 const voucher = ref<any>(null)
 const records = ref<any[]>([])
 const showOutbound = ref(false)
+const showLogistics = ref(false)
+const logistics = ref<any>(null)
+const trackInput = ref('')
 const scanInput = ref('')
 const photoInput = ref<HTMLInputElement>()
 const obForm = reactive({ plate_no: '', driver_name: '', driver_phone: '' })
@@ -159,6 +202,7 @@ async function load() {
   outbound.value = await getOutboundByOrder(orderId)
   voucher.value = await getVoucher(orderId)
   records.value = await getPayRecords(orderId)
+  logistics.value = await getLogisticsByOrder(orderId)
 }
 
 async function onPay(type: 'DEPOSIT' | 'TAIL') {
@@ -203,6 +247,23 @@ async function onVerify() {
   ElMessage.success('核销成功，放行！')
   load()
 }
+
+async function onCreateLogistics() {
+  await createLogistics({ order_id: orderId, waybill_no: waybillNo.value, ...obForm })
+  ElMessage.success('运单已登记')
+  showLogistics.value = false
+  load()
+}
+
+async function onTrack() {
+  if (!trackInput.value) return
+  await addTrack(logistics.value.id, trackInput.value)
+  trackInput.value = ''
+  ElMessage.success('轨迹已更新')
+  load()
+}
+
+const waybillNo = ref('')
 
 onMounted(load)
 </script>

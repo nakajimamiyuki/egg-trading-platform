@@ -63,6 +63,13 @@ async def create_purchase_order(
     if sale_mode == "M3":
         if not credit_days:
             raise BizError("渠道账期模式必须填写账期天数")
+        # F1.3: 渠道方须先通过风控尽调
+        from app.models import RiskSurvey
+        survey = await db.scalar(select(RiskSurvey).where(
+            RiskSurvey.enterprise_id == buyer_user.enterprise_id,
+            RiskSurvey.conclusion == "PASS", RiskSurvey.deleted == False))  # noqa: E712
+        if not survey:
+            raise BizError("渠道账期模式要求买方已通过风控尽调 (F1.3), 请联系平台风控团队")
         profit_per = await get_config_decimal(db, "platform_profit_per_unit", "1.00")
         platform_profit = (profit_per * quantity).quantize(Decimal("0.01"))
 

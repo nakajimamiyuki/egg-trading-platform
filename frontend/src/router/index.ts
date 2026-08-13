@@ -27,6 +27,11 @@ const routes: RouteRecordRaw[] = [
       { path: 'finance/invoices', component: () => import('../views/finance/Invoices.vue'), meta: { title: '发票管理', roles: ['CUSTOMER', 'FINANCE'] } },
       { path: 'finance/manual-pay', component: () => import('../views/finance/ManualPay.vue'), meta: { title: '付款执行', roles: ['FINANCE'] } },
       { path: 'contract/list', component: () => import('../views/contract/List.vue'), meta: { title: '合同管理' } },
+      { path: 'risk/center', component: () => import('../views/risk/CloseCenter.vue'), meta: { title: '平仓风控', roles: ['FARM', 'BUSINESS', 'FINANCE'] } },
+      { path: 'risk/survey', component: () => import('../views/risk/Survey.vue'), meta: { title: '渠道尽调', roles: ['BUSINESS', 'FINANCE'] } },
+      { path: 'reconcile/center', component: () => import('../views/reconcile/Center.vue'), meta: { title: '对账中心', roles: ['BUSINESS', 'FINANCE'] } },
+      { path: 'dashboard/board', component: () => import('../views/dashboard/Board.vue'), meta: { title: '数据看板', roles: ['BUSINESS', 'FINANCE'] } },
+      { path: 'incentive/list', component: () => import('../views/incentive/List.vue'), meta: { title: '合作激励', roles: ['FARM', 'BUSINESS'] } },
       { path: 'system/config', component: () => import('../views/system/Config.vue'), meta: { title: '参数配置', roles: ['ADMIN'] } }
     ]
   }

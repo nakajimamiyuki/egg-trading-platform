@@ -115,6 +115,25 @@ async def _cb_invoice_audit(db: AsyncSession, biz_id: int, passed: bool) -> None
         inv.status = "APPLY"
 
 
+async def _cb_close_apply(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """养殖端平仓申请审批 (F7.2)"""
+    from app.models import CloseApply
+    if passed:
+        from app.modules.risk.service import on_apply_approved
+        await on_apply_approved(db, biz_id)
+    else:
+        apply = await db.get(CloseApply, biz_id)
+        if apply:
+            apply.status = "REJECT"
+
+
+async def _cb_close_refund(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """平仓退款审批 (F7.4)"""
+    if passed:
+        from app.modules.risk.service import on_close_refund_approved
+        await on_close_refund_approved(db, biz_id)
+
+
 BIZ_CALLBACKS = {
     "ENTERPRISE_AUDIT": _cb_enterprise_audit,
     "WAREHOUSE_LEASE": _cb_warehouse_lease,
@@ -125,6 +144,8 @@ BIZ_CALLBACKS = {
     "SALE_APPLY": _cb_sale_apply,
     "CONTRACT_SIGN": _cb_contract_sign,
     "INVOICE_AUDIT": _cb_invoice_audit,
+    "CLOSE_APPLY": _cb_close_apply,
+    "CLOSE_REFUND": _cb_close_refund,
 }
 
 
