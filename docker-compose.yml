@@ -1,0 +1,124 @@
+name: egg-platform
+
+# 蛋品交易平台 - 本地开发环境
+# 用法:
+#   docker compose up -d              # 启动全部服务
+#   docker compose up -d postgres redis rabbitmq minio   # 只启动中间件
+#   docker compose logs -f backend    # 看后端日志
+#   docker compose down               # 停止
+#   docker compose down -v            # 停止并清空数据(谨慎!)
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: egg-postgres
+    environment:
+      POSTGRES_DB: egg_platform
+      POSTGRES_USER: egg
+      POSTGRES_PASSWORD: egg_dev_2026
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # 首次启动(空数据卷)时自动执行建库脚本
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U egg -d egg_platform"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7
+    container_name: egg-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: egg-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: egg
+      RABBITMQ_DEFAULT_PASS: egg_dev_2026
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # 管理后台 http://localhost:15672 (egg/egg_dev_2026)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: minio/minio
+    container_name: egg-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: egg
+      MINIO_ROOT_PASSWORD: egg_dev_2026
+    ports:
+      - "9000:9000"    # S3 API
+      - "9001:9001"    # 控制台 http://localhost:9001 (egg/egg_dev_2026)
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  backend:
+    build: ./backend
+    container_name: egg-backend
+    environment:
+      APP_ENV: dev
+      DATABASE_URL: postgresql+asyncpg://egg:egg_dev_2026@postgres:5432/egg_platform
+      REDIS_URL: redis://redis:6379/0
+      RABBITMQ_URL: amqp://egg:egg_dev_2026@rabbitmq:5672/
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: egg
+      MINIO_SECRET_KEY: egg_dev_2026
+      MINIO_BUCKET: egg-files
+      JWT_SECRET: dev-only-secret-change-in-prod
+      JWT_EXPIRE_MINUTES: "720"
+    ports:
+      - "8000:8000"
+    volumes:
+      # 开发期挂载源码, uvicorn --reload 热更新
+      - ./backend/app:/app/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    build: ./frontend
+    container_name: egg-frontend
+    ports:
+      - "8080:80"  # http://localhost:8080 (80被本机其他项目占用)
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  pg_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
