@@ -29,7 +29,8 @@ async def _cb_warehouse_lease(db: AsyncSession, biz_id: int, passed: bool) -> No
 
 
 async def _cb_delivery_wh_create(db: AsyncSession, biz_id: int, passed: bool) -> None:
-    """交割仓建立审批 (F2.3): 通过则建立交割仓 + 库存初始化"""
+    """交割仓建立审批 (F2.3): 通过则建立交割仓 + 库存初始化 + 货架自动上架(F4.1)"""
+    from app.models import Product, ShelfItem
     from app.modules.inventory.service import change_inventory, get_or_create_product
 
     dw = await db.get(DeliveryWarehouse, biz_id)
@@ -42,12 +43,53 @@ async def _cb_delivery_wh_create(db: AsyncSession, biz_id: int, passed: bool) ->
     dw.inbound_date = date.today()
     product = await get_or_create_product(db, dw.grade, dw.spec)
     await change_inventory(db, dw.warehouse_id, product.id, dw.quantity, "INIT", biz_id=dw.id)
+    # 实时库存自动上架
+    if dw.price:
+        db.add(ShelfItem(delivery_warehouse_id=dw.id, product_id=product.id, quantity=dw.quantity,
+                         price=dw.price, source_enterprise_id=dw.enterprise_id, status="ON"))
+
+
+async def _cb_order_audit(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """订单业务审核 (F4.2): 通过则进入待付定金"""
+    from app.models import OrderInfo
+    from app.modules.order.service import cancel_order, transition
+
+    order = await db.get(OrderInfo, biz_id)
+    if not order:
+        return
+    if passed:
+        await transition(db, order, "DEPOSIT_PENDING", None, "业务审核通过, 待客户支付定金")
+    else:
+        await cancel_order(db, order, None)
+
+
+async def _cb_payment_80(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    if passed:
+        from app.modules.finance.service import on_advance_approved
+        await on_advance_approved(db, biz_id)
+
+
+async def _cb_payment_20(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    if passed:
+        from app.modules.finance.service import on_settle_approved
+        await on_settle_approved(db, biz_id)
+
+
+async def _cb_sale_apply(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """养殖端建单销售申请 (F3.1): 通过则交割仓标记已申请销售"""
+    dw = await db.get(DeliveryWarehouse, biz_id)
+    if dw and dw.status == "IN_STOCK" and passed:
+        dw.status = "APPLYING"
 
 
 BIZ_CALLBACKS = {
     "ENTERPRISE_AUDIT": _cb_enterprise_audit,
     "WAREHOUSE_LEASE": _cb_warehouse_lease,
     "DELIVERY_WH_CREATE": _cb_delivery_wh_create,
+    "ORDER_AUDIT": _cb_order_audit,
+    "PAYMENT_80": _cb_payment_80,
+    "PAYMENT_20": _cb_payment_20,
+    "SALE_APPLY": _cb_sale_apply,
 }
 
 

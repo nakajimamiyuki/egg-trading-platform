@@ -45,3 +45,36 @@ async def change_inventory(
         biz_type=biz_type, biz_id=biz_id, created_by=operator_id,
     ))
     return inv
+
+
+async def lock_inventory(db: AsyncSession, warehouse_id: int, product_id: int, qty: int, biz_id: int) -> None:
+    """定金支付后锁定库存 (F4.2)"""
+    inv = await db.scalar(select(Inventory).where(Inventory.warehouse_id == warehouse_id, Inventory.product_id == product_id))
+    if not inv or inv.quantity - inv.locked_qty < qty:
+        raise BizError("可用库存不足, 无法锁定")
+    inv.locked_qty += qty
+    inv.version += 1
+    db.add(InventoryLog(warehouse_id=warehouse_id, product_id=product_id, change_qty=0,
+                        before_qty=inv.quantity, after_qty=inv.quantity, biz_type="LOCK", biz_id=biz_id))
+
+
+async def unlock_inventory(db: AsyncSession, warehouse_id: int, product_id: int, qty: int, biz_id: int) -> None:
+    inv = await db.scalar(select(Inventory).where(Inventory.warehouse_id == warehouse_id, Inventory.product_id == product_id))
+    if inv:
+        inv.locked_qty = max(0, inv.locked_qty - qty)
+        inv.version += 1
+        db.add(InventoryLog(warehouse_id=warehouse_id, product_id=product_id, change_qty=0,
+                            before_qty=inv.quantity, after_qty=inv.quantity, biz_type="UNLOCK", biz_id=biz_id))
+
+
+async def release_inventory(db: AsyncSession, warehouse_id: int, product_id: int, qty: int, biz_id: int) -> None:
+    """核销放行: 扣减库存并解除锁定 (F5.3)"""
+    inv = await db.scalar(select(Inventory).where(Inventory.warehouse_id == warehouse_id, Inventory.product_id == product_id))
+    if not inv or inv.quantity < qty or inv.locked_qty < qty:
+        raise BizError("库存或锁定量不足, 无法放行")
+    before = inv.quantity
+    inv.quantity -= qty
+    inv.locked_qty -= qty
+    inv.version += 1
+    db.add(InventoryLog(warehouse_id=warehouse_id, product_id=product_id, change_qty=-qty,
+                        before_qty=before, after_qty=inv.quantity, biz_type="OUT", biz_id=biz_id))

@@ -34,6 +34,9 @@ const router = useRouter()
 const ALL_MENUS = [
   { path: '/dashboard', title: '首页', roles: ['FARM', 'CUSTOMER', 'BUSINESS', 'FINANCE', 'ADMIN'] },
   { path: '/enterprise/my', title: '我的企业', roles: ['FARM', 'CUSTOMER'] },
+  { path: '/shelf/hall', title: '商品大厅', roles: ['CUSTOMER', 'BUSINESS'] },
+  { path: '/order/list', title: '订单管理', roles: ['FARM', 'CUSTOMER', 'BUSINESS', 'FINANCE'] },
+  { path: '/finance/bills', title: '账单中心', roles: ['FARM', 'CUSTOMER', 'BUSINESS', 'FINANCE'] },
   { path: '/warehouse/my', title: '我的仓库', roles: ['FARM'] },
   { path: '/warehouse/production', title: '产蛋录入', roles: ['FARM'] },
   { path: '/warehouse/delivery', title: '交割仓一览', roles: ['FARM', 'BUSINESS', 'FINANCE'] },
@@ -41,6 +44,7 @@ const ALL_MENUS = [
   { path: '/approval/mine', title: '我的申请', roles: ['FARM', 'CUSTOMER', 'BUSINESS'] },
   { path: '/approval/todo', title: '审批中心', roles: ['BUSINESS', 'FINANCE'] },
   { path: '/enterprise/list', title: '合作方管理', roles: ['BUSINESS'] },
+  { path: '/shelf/manage', title: '货架管理', roles: ['BUSINESS'] },
   { path: '/warehouse/list', title: '仓库管理', roles: ['BUSINESS'] },
   { path: '/system/config', title: '参数配置', roles: ['ADMIN'] }
 ]

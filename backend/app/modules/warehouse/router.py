@@ -30,6 +30,7 @@ class DwApply(BaseModel):
     quantity: int
     grade: str
     spec: str
+    price: float  # 上架单价(业务端定价)
 
 
 def _wh_dict(w: Warehouse) -> dict:
@@ -119,13 +120,29 @@ async def dw_apply(req: DwApply, ctx=Depends(require_roles("BUSINESS")), db: Asy
     turnover_days = await get_config_int(db, "turnover_days", 3)
 
     dw = DeliveryWarehouse(dw_no=dw_no, warehouse_id=wh.id, enterprise_id=wh.enterprise_id,
-                           quantity=req.quantity, grade=req.grade, spec=req.spec, turnover_days=turnover_days)
+                           quantity=req.quantity, grade=req.grade, spec=req.spec, price=req.price,
+                           turnover_days=turnover_days)
     db.add(dw)
     await db.flush()
     await WorkflowService(db).start("DELIVERY_WH_CREATE", biz_id=dw.id,
                                     title=f"交割仓建立审批: {wh.name} {req.grade}级 {req.quantity}枚", initiator_id=user.id)
     await db.commit()
     return ok(_dw_dict(dw), message="交割仓审批已发起")
+
+
+@router.post("/delivery/{dw_id}/sale-apply")
+async def dw_sale_apply(dw_id: int, ctx=Depends(require_roles("FARM")), db: AsyncSession = Depends(get_db)):
+    """养殖端建单销售申请 (F3.1): 选择交割仓, 提交平台业务申请"""
+    user, _ = ctx
+    dw = await db.get(DeliveryWarehouse, dw_id)
+    if not dw or dw.deleted or dw.enterprise_id != user.enterprise_id:
+        raise BizError("交割仓不存在", code=404)
+    if dw.status != "IN_STOCK":
+        raise BizError("仅在库状态可申请销售")
+    await WorkflowService(db).start("SALE_APPLY", biz_id=dw.id,
+                                    title=f"销售申请: {dw.dw_no} {dw.grade}级 {dw.quantity}枚", initiator_id=user.id)
+    await db.commit()
+    return ok(message="销售申请已提交, 待业务审核")
 
 
 @router.get("/delivery/list")

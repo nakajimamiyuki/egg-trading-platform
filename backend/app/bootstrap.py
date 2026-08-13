@@ -17,6 +17,7 @@ WF_SEEDS = [
     ("WAREHOUSE_LEASE", "仓库租赁审批", "WAREHOUSE_LEASE", [("业务审批", 1, "BUSINESS"), ("财务审批", 2, "FINANCE")]),
     ("DELIVERY_WH_CREATE", "交割仓建立审批", "DELIVERY_WH_CREATE", [("业务审批", 1, "BUSINESS")]),
     ("ORDER_AUDIT", "订单业务审核", "ORDER_AUDIT", [("业务审核", 1, "BUSINESS")]),
+    ("SALE_APPLY", "交割仓销售申请审批", "SALE_APPLY", [("业务审核", 1, "BUSINESS")]),
     ("CONTRACT_SIGN", "合同签署审批", "CONTRACT_SIGN", [("业务审批", 1, "BUSINESS"), ("财务审批", 2, "FINANCE")]),
     ("PAYMENT_80", "交割仓付款审批(80%垫资)", "PAYMENT_80", [("财务审批", 1, "FINANCE")]),
     ("PAYMENT_20", "交割仓尾款审批(20%结算)", "PAYMENT_20", [("财务审批", 1, "FINANCE")]),

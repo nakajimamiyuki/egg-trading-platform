@@ -27,7 +27,7 @@
         </el-table-column>
       </el-table>
       <div class="point-map">
-        <el-button size="small" @click="mapInput.click()">上传监控点位图</el-button>
+        <el-button size="small" @click="mapInput?.click()">上传监控点位图</el-button>
         <input ref="mapInput" type="file" hidden @change="onMapFile" />
         <span v-if="warehouse?.point_map_file_id"> ✓ 已上传(file_id: {{ warehouse.point_map_file_id }})</span>
       </div>

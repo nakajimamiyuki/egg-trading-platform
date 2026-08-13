@@ -19,6 +19,11 @@ const routes: RouteRecordRaw[] = [
       { path: 'warehouse/list', component: () => import('../views/warehouse/WarehouseList.vue'), meta: { title: '仓库管理', roles: ['BUSINESS'] } },
       { path: 'warehouse/delivery', component: () => import('../views/warehouse/DeliveryList.vue'), meta: { title: '交割仓一览', roles: ['FARM', 'BUSINESS', 'FINANCE'] } },
       { path: 'warehouse/inventory', component: () => import('../views/warehouse/InventoryList.vue'), meta: { title: '库存查询', roles: ['FARM', 'BUSINESS', 'FINANCE'] } },
+      { path: 'shelf/hall', component: () => import('../views/shelf/Hall.vue'), meta: { title: '商品大厅', roles: ['CUSTOMER', 'BUSINESS'] } },
+      { path: 'shelf/manage', component: () => import('../views/shelf/Manage.vue'), meta: { title: '货架管理', roles: ['BUSINESS'] } },
+      { path: 'order/list', component: () => import('../views/order/List.vue'), meta: { title: '订单管理' } },
+      { path: 'order/detail/:id', component: () => import('../views/order/Detail.vue'), meta: { title: '订单详情' } },
+      { path: 'finance/bills', component: () => import('../views/finance/Bills.vue'), meta: { title: '账单中心' } },
       { path: 'system/config', component: () => import('../views/system/Config.vue'), meta: { title: '参数配置', roles: ['ADMIN'] } }
     ]
   }

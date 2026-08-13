@@ -48,3 +48,30 @@ export const uploadPointMap = (warehouseId: number, fileId: number) =>
   request.post(`/iot/warehouses/${warehouseId}/point-map`, { file_id: fileId })
 
 export const getInventoryList = () => request.get('/inventory/list')
+
+// ---------- M3: 货架 / 订单 / 资金 / 交付 ----------
+export const getShelfList = (params?: Record<string, unknown>) => request.get('/shelf/list', { params })
+export const getShelfManage = () => request.get('/shelf/manage')
+export const setShelfPrice = (id: number, price: number) => request.put(`/shelf/${id}/price`, { price })
+export const setShelfStatus = (id: number, status: 'ON' | 'OFF') => request.put(`/shelf/${id}/status`, { status })
+
+export const createPurchase = (data: { shelf_item_id: number; quantity: number; sale_mode: string; credit_days?: number; designated?: boolean }) =>
+  request.post('/orders/purchase', data)
+export const getOrderList = (status?: string) => request.get('/orders/list', { params: status ? { status } : {} })
+export const getOrderDetail = (id: number) => request.get(`/orders/${id}`)
+export const cancelOrder = (id: number) => request.post(`/orders/${id}/cancel`)
+export const dwSaleApply = (dwId: number) => request.post(`/warehouse/delivery/${dwId}/sale-apply`)
+
+export const pay = (orderId: number, payType: 'DEPOSIT' | 'TAIL') => request.post('/finance/pay', { order_id: orderId, pay_type: payType })
+export const getPayRecords = (orderId?: number) => request.get('/finance/records', { params: orderId ? { order_id: orderId } : {} })
+export const getBills = () => request.get('/finance/bills')
+
+export const createOutbound = (data: { order_id: number; plate_no: string; driver_name: string; driver_phone: string }) =>
+  request.post('/delivery/outbound', data)
+export const getOutboundByOrder = (orderId: number) => request.get(`/delivery/outbound/by-order/${orderId}`)
+export const addOutboundFile = (outboundId: number, fileId: number, mediaType: 'PHOTO' | 'VIDEO') =>
+  request.post(`/delivery/outbound/${outboundId}/files`, { file_id: fileId, media_type: mediaType })
+export const confirmOutbound = (outboundId: number, side: 'seller' | 'buyer' | 'platform') =>
+  request.post(`/delivery/outbound/${outboundId}/confirm/${side}`)
+export const getVoucher = (orderId: number) => request.get(`/delivery/voucher/by-order/${orderId}`)
+export const verifyVoucher = (qrPayload: string) => request.post('/delivery/verify', { qr_payload: qrPayload })
