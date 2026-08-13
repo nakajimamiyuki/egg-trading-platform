@@ -1,12 +1,14 @@
 from fastapi import APIRouter
 
 from app.modules.auth.router import router as auth_router
+from app.modules.contract.router import router as contract_router
 from app.modules.delivery.router import router as delivery_router
 from app.modules.dict.router import router as dict_router
 from app.modules.enterprise.router import router as enterprise_router
 from app.modules.file.router import router as file_router
 from app.modules.finance.router import router as finance_router
 from app.modules.inventory.router import router as inventory_router
+from app.modules.invoice.router import router as invoice_router
 from app.modules.iot.router import router as iot_router
 from app.modules.message.router import router as message_router
 from app.modules.order.router import router as order_router
@@ -30,3 +32,5 @@ api_router.include_router(shelf_router, prefix="/shelf", tags=["现货货架"])
 api_router.include_router(order_router, prefix="/orders", tags=["订单"])
 api_router.include_router(finance_router, prefix="/finance", tags=["资金结算"])
 api_router.include_router(delivery_router, prefix="/delivery", tags=["提货交付"])
+api_router.include_router(contract_router, prefix="/contract", tags=["电子合同"])
+api_router.include_router(invoice_router, prefix="/invoice", tags=["电子发票"])

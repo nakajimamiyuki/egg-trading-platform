@@ -430,3 +430,37 @@ class PickupVoucher(Base):
     verified_time: Mapped[datetime | None] = mapped_column(DateTime)
     created_time: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+# ---------------- 合同与发票 (M4) ----------------
+
+class Contract(Base, TimestampMixin):
+    __tablename__ = "contract"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    contract_no: Mapped[str] = mapped_column(String(32), unique=True)
+    type: Mapped[str] = mapped_column(String(30))  # SETTLE入驻/SALE销售
+    order_id: Mapped[int | None] = mapped_column(BigInteger)
+    party_a_id: Mapped[int] = mapped_column(BigInteger)  # 甲方=平台
+    party_b_id: Mapped[int] = mapped_column(BigInteger)  # 乙方=企业
+    file_id: Mapped[int | None] = mapped_column(BigInteger)
+    sign_status: Mapped[str] = mapped_column(String(20), default="DRAFT")
+    party_a_signed: Mapped[bool] = mapped_column(Boolean, default=False)
+    party_a_time: Mapped[datetime | None] = mapped_column(DateTime)
+    party_b_signed: Mapped[bool] = mapped_column(Boolean, default=False)
+    party_b_time: Mapped[datetime | None] = mapped_column(DateTime)
+    esign_flow_id: Mapped[str | None] = mapped_column(String(64))
+    signed_time: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class Invoice(Base, TimestampMixin):
+    __tablename__ = "invoice"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    invoice_no: Mapped[str | None] = mapped_column(String(50))
+    order_id: Mapped[int] = mapped_column(BigInteger)
+    bill_id: Mapped[int | None] = mapped_column(BigInteger)
+    type: Mapped[str] = mapped_column(String(20), default="VAT")
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    buyer_title: Mapped[str | None] = mapped_column(String(100))
+    tax_no: Mapped[str | None] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(20), default="APPLY")  # APPLY/AUDITING/ISSUED/ARCHIVED
+    file_id: Mapped[int | None] = mapped_column(BigInteger)

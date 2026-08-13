@@ -14,11 +14,20 @@ from app.models import DeliveryWarehouse, Enterprise, SysUser, Warehouse, WfDefi
 
 
 async def _cb_enterprise_audit(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    from app.modules.message.router import notify_enterprise
+
     ent = await db.get(Enterprise, biz_id)
     if ent:
         ent.audit_status = "PASS" if passed else "REJECT"
         if passed:
             ent.coop_evaluation = "准入审批通过，初始合作评价：良好"
+            # 入驻电子合同: 仅首次入驻生成 (F1.5/F3.2)
+            from app.modules.contract.service import generate_settle_contract
+            await generate_settle_contract(db, ent, initiator_id=ent.created_by or 1)
+        await notify_enterprise(db, ent.id, "APPROVAL",
+                                f"企业准入审批{'已通过' if passed else '被驳回'}",
+                                f"{ent.enterprise_name}: {'欢迎入驻平台' if passed else '请完善资料后重新提交'}",
+                                "ENTERPRISE_AUDIT", ent.id)
 
 
 async def _cb_warehouse_lease(db: AsyncSession, biz_id: int, passed: bool) -> None:
@@ -59,6 +68,9 @@ async def _cb_order_audit(db: AsyncSession, biz_id: int, passed: bool) -> None:
         return
     if passed:
         await transition(db, order, "DEPOSIT_PENDING", None, "业务审核通过, 待客户支付定金")
+        # 生成销售合同并发起签署审批 (F9.3)
+        from app.modules.contract.service import generate_sale_contract
+        await generate_sale_contract(db, order, initiator_id=order.created_by or 1)
     else:
         await cancel_order(db, order, None)
 
@@ -82,6 +94,27 @@ async def _cb_sale_apply(db: AsyncSession, biz_id: int, passed: bool) -> None:
         dw.status = "APPLYING"
 
 
+async def _cb_contract_sign(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """合同签署审批 (F3.2): 通过则合同进入双方在线签署"""
+    from app.models import Contract
+    c = await db.get(Contract, biz_id)
+    if c:
+        c.sign_status = "SIGNING" if passed else "DRAFT"
+
+
+async def _cb_invoice_audit(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """发票审批 (F6.3): 通过则开具"""
+    from app.models import Invoice
+    from app.modules.invoice.service import issue
+    inv = await db.get(Invoice, biz_id)
+    if not inv:
+        return
+    if passed:
+        await issue(db, inv)
+    else:
+        inv.status = "APPLY"
+
+
 BIZ_CALLBACKS = {
     "ENTERPRISE_AUDIT": _cb_enterprise_audit,
     "WAREHOUSE_LEASE": _cb_warehouse_lease,
@@ -90,6 +123,8 @@ BIZ_CALLBACKS = {
     "PAYMENT_80": _cb_payment_80,
     "PAYMENT_20": _cb_payment_20,
     "SALE_APPLY": _cb_sale_apply,
+    "CONTRACT_SIGN": _cb_contract_sign,
+    "INVOICE_AUDIT": _cb_invoice_audit,
 }
 
 

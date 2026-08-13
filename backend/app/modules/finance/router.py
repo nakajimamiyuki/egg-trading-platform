@@ -49,6 +49,20 @@ async def pay_records(order_id: int | None = None, ctx=Depends(get_current_user)
     ])
 
 
+class ManualConfirm(BaseModel):
+    voucher_file_id: int
+
+
+@router.post("/records/{record_id}/confirm-manual")
+async def confirm_manual(record_id: int, req: ManualConfirm, ctx=Depends(require_roles("FINANCE")),
+                         db: AsyncSession = Depends(get_db)):
+    """人工转账兜底: 财务上传回单后确认到账 (银企直联就绪前的付款方式)"""
+    user, _ = ctx
+    rec = await finance_service.confirm_manual_payment(db, record_id, req.voucher_file_id, user.id)
+    await db.commit()
+    return ok({"pay_no": rec.pay_no}, message="回单已确认, 付款生效")
+
+
 @router.get("/bills")
 async def my_bills(ctx=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """账单中心 (F6.4)"""

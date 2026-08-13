@@ -495,9 +495,13 @@ CREATE TABLE contract (
     order_id     BIGINT,                  -- 销售合同关联订单
     party_a_id   BIGINT       NOT NULL,   -- 甲方(企业id)
     party_b_id   BIGINT       NOT NULL,
-    file_id      BIGINT,                  -- 已签章PDF -> file_record
+    file_id      BIGINT,                  -- 已签章文件 -> file_record
     sign_status  VARCHAR(20)  NOT NULL DEFAULT 'DRAFT', -- DRAFT/SIGNING/SIGNED/ARCHIVED
-    esign_flow_id VARCHAR(64),            -- 第三方签署流程号
+    party_a_signed BOOLEAN    NOT NULL DEFAULT FALSE,
+    party_a_time  TIMESTAMP,
+    party_b_signed BOOLEAN    NOT NULL DEFAULT FALSE,
+    party_b_time  TIMESTAMP,
+    esign_flow_id VARCHAR(64),            -- 第三方签署流程号(接入e签宝后使用)
     signed_time  TIMESTAMP,
     created_time TIMESTAMP    NOT NULL DEFAULT now(),
     updated_time TIMESTAMP    NOT NULL DEFAULT now(),

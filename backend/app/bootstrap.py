@@ -28,6 +28,12 @@ WF_SEEDS = [
 
 async def bootstrap() -> None:
     async with async_session() as db:
+        # 0. 平台运营方企业(合同甲方)
+        from app.models import Enterprise
+        platform = await db.scalar(select(Enterprise).where(Enterprise.type == "PLATFORM"))
+        if not platform:
+            db.add(Enterprise(enterprise_name="蛋品交易平台运营方", type="PLATFORM", audit_status="PASS"))
+
         # 1. 初始管理员
         admin = await db.scalar(select(SysUser).where(SysUser.username == settings.ADMIN_USERNAME))
         if not admin:

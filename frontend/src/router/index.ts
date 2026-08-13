@@ -24,6 +24,9 @@ const routes: RouteRecordRaw[] = [
       { path: 'order/list', component: () => import('../views/order/List.vue'), meta: { title: '订单管理' } },
       { path: 'order/detail/:id', component: () => import('../views/order/Detail.vue'), meta: { title: '订单详情' } },
       { path: 'finance/bills', component: () => import('../views/finance/Bills.vue'), meta: { title: '账单中心' } },
+      { path: 'finance/invoices', component: () => import('../views/finance/Invoices.vue'), meta: { title: '发票管理', roles: ['CUSTOMER', 'FINANCE'] } },
+      { path: 'finance/manual-pay', component: () => import('../views/finance/ManualPay.vue'), meta: { title: '付款执行', roles: ['FINANCE'] } },
+      { path: 'contract/list', component: () => import('../views/contract/List.vue'), meta: { title: '合同管理' } },
       { path: 'system/config', component: () => import('../views/system/Config.vue'), meta: { title: '参数配置', roles: ['ADMIN'] } }
     ]
   }

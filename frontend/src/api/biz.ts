@@ -75,3 +75,18 @@ export const confirmOutbound = (outboundId: number, side: 'seller' | 'buyer' | '
   request.post(`/delivery/outbound/${outboundId}/confirm/${side}`)
 export const getVoucher = (orderId: number) => request.get(`/delivery/voucher/by-order/${orderId}`)
 export const verifyVoucher = (qrPayload: string) => request.post('/delivery/verify', { qr_payload: qrPayload })
+
+// ---------- M4: 合同 / 发票 / 人工付款 ----------
+export const getContractList = () => request.get('/contract/list')
+export const getContract = (id: number) => request.get(`/contract/${id}`)
+export const signContract = (id: number) => request.post(`/contract/${id}/sign`)
+export const archiveContract = (id: number) => request.post(`/contract/${id}/archive`)
+
+export const applyInvoice = (data: { order_id: number; buyer_title: string; tax_no: string }) =>
+  request.post('/invoice/apply', data)
+export const getInvoiceList = () => request.get('/invoice/list')
+export const archiveInvoice = (id: number) => request.post(`/invoice/${id}/archive`)
+export const checkInvoice = (invoiceNo: string) => request.get(`/invoice/check/${invoiceNo}`)
+
+export const confirmManualPay = (recordId: number, voucherFileId: number) =>
+  request.post(`/finance/records/${recordId}/confirm-manual`, { voucher_file_id: voucherFileId })
