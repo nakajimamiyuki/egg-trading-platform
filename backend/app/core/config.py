@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     RABBITMQ_URL: str = "amqp://egg:egg_dev_2026@localhost:5672/"
 
     MINIO_ENDPOINT: str = "localhost:9000"
+    # 预签名URL用外部可达地址(浏览器访问), 容器内连接用 MINIO_ENDPOINT
+    MINIO_PUBLIC_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "egg"
     MINIO_SECRET_KEY: str = "egg_dev_2026"
     MINIO_BUCKET: str = "egg-files"

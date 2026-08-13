@@ -4,24 +4,149 @@
   await WorkflowService(db).handle(task_id, user, roles, action="PASS"/"REJECT", opinion=...)
 审批全部通过后自动回写业务状态 (BIZ_CALLBACKS)
 """
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.response import BizError
-from app.models import Enterprise, SysUser, WfDefinition, WfInstance, WfNode, WfTask
+from app.models import DeliveryWarehouse, Enterprise, SysUser, Warehouse, WfDefinition, WfInstance, WfNode, WfTask
 
 
 async def _cb_enterprise_audit(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    from app.modules.message.router import notify_enterprise
+
     ent = await db.get(Enterprise, biz_id)
     if ent:
         ent.audit_status = "PASS" if passed else "REJECT"
         if passed:
             ent.coop_evaluation = "准入审批通过，初始合作评价：良好"
+            # 入驻电子合同: 仅首次入驻生成 (F1.5/F3.2)
+            from app.modules.contract.service import generate_settle_contract
+            await generate_settle_contract(db, ent, initiator_id=ent.created_by or 1)
+        await notify_enterprise(db, ent.id, "APPROVAL",
+                                f"企业准入审批{'已通过' if passed else '被驳回'}",
+                                f"{ent.enterprise_name}: {'欢迎入驻平台' if passed else '请完善资料后重新提交'}",
+                                "ENTERPRISE_AUDIT", ent.id)
 
 
-BIZ_CALLBACKS = {"ENTERPRISE_AUDIT": _cb_enterprise_audit}
+async def _cb_warehouse_lease(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """仓库租赁审批 (F2.1): 通过则仓库转为已租赁"""
+    wh = await db.get(Warehouse, biz_id)
+    if wh:
+        wh.lease_status = "LEASED" if passed else "NONE"
+
+
+async def _cb_delivery_wh_create(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """交割仓建立审批 (F2.3): 通过则建立交割仓 + 库存初始化 + 货架自动上架(F4.1)"""
+    from app.models import Product, ShelfItem
+    from app.modules.inventory.service import change_inventory, get_or_create_product
+
+    dw = await db.get(DeliveryWarehouse, biz_id)
+    if not dw:
+        return
+    if not passed:
+        dw.status = "REJECTED"
+        return
+    dw.status = "IN_STOCK"
+    dw.inbound_date = date.today()
+    product = await get_or_create_product(db, dw.grade, dw.spec)
+    await change_inventory(db, dw.warehouse_id, product.id, dw.quantity, "INIT", biz_id=dw.id)
+    # 实时库存自动上架
+    if dw.price:
+        db.add(ShelfItem(delivery_warehouse_id=dw.id, product_id=product.id, quantity=dw.quantity,
+                         price=dw.price, source_enterprise_id=dw.enterprise_id, status="ON"))
+
+
+async def _cb_order_audit(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """订单业务审核 (F4.2): 通过则进入待付定金"""
+    from app.models import OrderInfo
+    from app.modules.order.service import cancel_order, transition
+
+    order = await db.get(OrderInfo, biz_id)
+    if not order:
+        return
+    if passed:
+        await transition(db, order, "DEPOSIT_PENDING", None, "业务审核通过, 待客户支付定金")
+        # 生成销售合同并发起签署审批 (F9.3)
+        from app.modules.contract.service import generate_sale_contract
+        await generate_sale_contract(db, order, initiator_id=order.created_by or 1)
+    else:
+        await cancel_order(db, order, None)
+
+
+async def _cb_payment_80(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    if passed:
+        from app.modules.finance.service import on_advance_approved
+        await on_advance_approved(db, biz_id)
+
+
+async def _cb_payment_20(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    if passed:
+        from app.modules.finance.service import on_settle_approved
+        await on_settle_approved(db, biz_id)
+
+
+async def _cb_sale_apply(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """养殖端建单销售申请 (F3.1): 通过则交割仓标记已申请销售"""
+    dw = await db.get(DeliveryWarehouse, biz_id)
+    if dw and dw.status == "IN_STOCK" and passed:
+        dw.status = "APPLYING"
+
+
+async def _cb_contract_sign(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """合同签署审批 (F3.2): 通过则合同进入双方在线签署"""
+    from app.models import Contract
+    c = await db.get(Contract, biz_id)
+    if c:
+        c.sign_status = "SIGNING" if passed else "DRAFT"
+
+
+async def _cb_invoice_audit(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """发票审批 (F6.3): 通过则开具"""
+    from app.models import Invoice
+    from app.modules.invoice.service import issue
+    inv = await db.get(Invoice, biz_id)
+    if not inv:
+        return
+    if passed:
+        await issue(db, inv)
+    else:
+        inv.status = "APPLY"
+
+
+async def _cb_close_apply(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """养殖端平仓申请审批 (F7.2)"""
+    from app.models import CloseApply
+    if passed:
+        from app.modules.risk.service import on_apply_approved
+        await on_apply_approved(db, biz_id)
+    else:
+        apply = await db.get(CloseApply, biz_id)
+        if apply:
+            apply.status = "REJECT"
+
+
+async def _cb_close_refund(db: AsyncSession, biz_id: int, passed: bool) -> None:
+    """平仓退款审批 (F7.4)"""
+    if passed:
+        from app.modules.risk.service import on_close_refund_approved
+        await on_close_refund_approved(db, biz_id)
+
+
+BIZ_CALLBACKS = {
+    "ENTERPRISE_AUDIT": _cb_enterprise_audit,
+    "WAREHOUSE_LEASE": _cb_warehouse_lease,
+    "DELIVERY_WH_CREATE": _cb_delivery_wh_create,
+    "ORDER_AUDIT": _cb_order_audit,
+    "PAYMENT_80": _cb_payment_80,
+    "PAYMENT_20": _cb_payment_20,
+    "SALE_APPLY": _cb_sale_apply,
+    "CONTRACT_SIGN": _cb_contract_sign,
+    "INVOICE_AUDIT": _cb_invoice_audit,
+    "CLOSE_APPLY": _cb_close_apply,
+    "CLOSE_REFUND": _cb_close_refund,
+}
 
 
 class WorkflowService:

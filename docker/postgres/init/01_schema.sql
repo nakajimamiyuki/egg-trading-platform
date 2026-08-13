@@ -8,6 +8,9 @@
 
 SET client_encoding = 'UTF8';
 
+-- 单据编号全局序列(防并发重号): 所有 单号=前缀+日期+序号 统一使用
+CREATE SEQUENCE IF NOT EXISTS doc_seq START 1;
+
 -- -------------------------------------------------------------
 -- 一、系统与权限 (F9.1)
 -- -------------------------------------------------------------
@@ -242,9 +245,10 @@ CREATE TABLE delivery_warehouse (
     quantity         INT          NOT NULL,          -- 初始入库数量
     grade            VARCHAR(20)  NOT NULL,
     spec             VARCHAR(20)  NOT NULL,
-    inbound_date     DATE         NOT NULL,
-    turnover_days    INT          NOT NULL DEFAULT 3,      -- 周转天数(预警用, F7.1)
-    status           VARCHAR(20)  NOT NULL DEFAULT 'IN_STOCK', -- IN_STOCK在库/APPLYING已申请销售/SOLD已售/CLOSED已平仓/RETURNED已退仓
+    price            NUMERIC(14,2),                    -- 上架单价(业务端定价)
+    inbound_date     DATE,                                   -- 审批通过建仓时写入
+    turnover_days    INT          NOT NULL DEFAULT 3,        -- 周转天数(预警用, F7.1)
+    status           VARCHAR(20)  NOT NULL DEFAULT 'AUDITING', -- AUDITING审批中/IN_STOCK在库/APPLYING/SOLD/CLOSED/RETURNED/REJECTED
     created_time     TIMESTAMP    NOT NULL DEFAULT now(),
     updated_time     TIMESTAMP    NOT NULL DEFAULT now(),
     deleted          BOOLEAN      NOT NULL DEFAULT FALSE
@@ -389,7 +393,7 @@ CREATE TABLE order_event (
 CREATE TABLE pay_record (
     id            BIGSERIAL PRIMARY KEY,
     pay_no        VARCHAR(32)  NOT NULL UNIQUE,
-    order_id      BIGINT       NOT NULL REFERENCES order_info(id),
+    order_id      BIGINT       REFERENCES order_info(id),  -- 平仓退款等无订单场景为空
     direction     VARCHAR(10)  NOT NULL,   -- IN收款(客户->平台) / OUT付款(平台->养殖户/退款)
     pay_type      VARCHAR(20)  NOT NULL,   -- DEPOSIT定金/TAIL尾款/ADVANCE垫资80%/SETTLE尾款20%/REFUND退款/CHANNEL_PAY渠道回款
     amount        NUMERIC(14,2) NOT NULL,
@@ -494,9 +498,13 @@ CREATE TABLE contract (
     order_id     BIGINT,                  -- 销售合同关联订单
     party_a_id   BIGINT       NOT NULL,   -- 甲方(企业id)
     party_b_id   BIGINT       NOT NULL,
-    file_id      BIGINT,                  -- 已签章PDF -> file_record
+    file_id      BIGINT,                  -- 已签章文件 -> file_record
     sign_status  VARCHAR(20)  NOT NULL DEFAULT 'DRAFT', -- DRAFT/SIGNING/SIGNED/ARCHIVED
-    esign_flow_id VARCHAR(64),            -- 第三方签署流程号
+    party_a_signed BOOLEAN    NOT NULL DEFAULT FALSE,
+    party_a_time  TIMESTAMP,
+    party_b_signed BOOLEAN    NOT NULL DEFAULT FALSE,
+    party_b_time  TIMESTAMP,
+    esign_flow_id VARCHAR(64),            -- 第三方签署流程号(接入e签宝后使用)
     signed_time  TIMESTAMP,
     created_time TIMESTAMP    NOT NULL DEFAULT now(),
     updated_time TIMESTAMP    NOT NULL DEFAULT now(),

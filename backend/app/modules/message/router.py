@@ -47,3 +47,23 @@ async def notify(db: AsyncSession, user_ids: list[int], type_: str, title: str, 
     """供其他模块调用的站内信发送"""
     for uid in user_ids:
         db.add(Message(user_id=uid, type=type_, title=title, content=content, biz_type=biz_type, biz_id=biz_id))
+
+
+async def notify_enterprise(db: AsyncSession, enterprise_id: int, type_: str, title: str, content: str = "",
+                            biz_type: str | None = None, biz_id: int | None = None) -> None:
+    """向某企业下所有用户发站内信"""
+    from app.models import SysUser
+    rows = await db.scalars(select(SysUser).where(SysUser.enterprise_id == enterprise_id, SysUser.deleted == False))  # noqa: E712
+    await notify(db, [u.id for u in rows.all()], type_, title, content, biz_type, biz_id)
+
+
+async def notify_role(db: AsyncSession, role_code: str, type_: str, title: str, content: str = "",
+                      biz_type: str | None = None, biz_id: int | None = None) -> None:
+    """向某角色所有用户发站内信"""
+    from app.models import SysRole, SysUser, SysUserRole
+    rows = await db.scalars(
+        select(SysUser).join(SysUserRole, SysUserRole.user_id == SysUser.id)
+        .join(SysRole, SysRole.id == SysUserRole.role_id)
+        .where(SysRole.code == role_code, SysUser.deleted == False)  # noqa: E712
+    )
+    await notify(db, [u.id for u in rows.all()], type_, title, content, biz_type, biz_id)
