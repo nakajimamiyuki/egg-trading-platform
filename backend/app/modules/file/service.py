@@ -8,6 +8,7 @@ from minio import Minio
 from app.core.config import settings
 
 _client: Minio | None = None
+_public_client: Minio | None = None
 
 
 def get_client() -> Minio:
@@ -20,6 +21,21 @@ def get_client() -> Minio:
             secure=settings.MINIO_SECURE,
         )
     return _client
+
+
+def get_public_client() -> Minio:
+    """预签名专用: endpoint 用外部可达地址, 否则浏览器无法打开链接
+    region 显式指定以避免 SDK 联网查询 bucket location"""
+    global _public_client
+    if _public_client is None:
+        _public_client = Minio(
+            settings.MINIO_PUBLIC_ENDPOINT,
+            access_key=settings.MINIO_ACCESS_KEY,
+            secret_key=settings.MINIO_SECRET_KEY,
+            secure=settings.MINIO_SECURE,
+            region="us-east-1",
+        )
+    return _public_client
 
 
 async def ensure_bucket() -> None:
@@ -43,7 +59,7 @@ async def upload(data: bytes, file_name: str, content_type: str) -> tuple[str, s
 
 
 async def presigned_url(bucket: str, object_key: str) -> str:
-    client = get_client()
+    client = get_public_client()
     return await asyncio.to_thread(
         client.presigned_get_object, bucket, object_key, timedelta(hours=2)
     )
