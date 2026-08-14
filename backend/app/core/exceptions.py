@@ -16,7 +16,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
-        return JSONResponse(status_code=200, content={"code": 422, "message": f"参数校验失败: {exc.errors()[0]['msg']}", "data": None})
+        err = exc.errors()[0]
+        field = ".".join(str(loc) for loc in err.get("loc", []) if loc not in ("body", "query", "path"))
+        label = f"字段 {field} " if field else ""
+        reason = "缺失或格式不正确" if err.get("type") == "missing" else err.get("msg", "格式不正确")
+        return JSONResponse(status_code=200, content={"code": 422, "message": f"参数校验失败: {label}{reason}", "data": None})
 
     @app.exception_handler(Exception)
     async def unknown_handler(_: Request, exc: Exception) -> JSONResponse:
