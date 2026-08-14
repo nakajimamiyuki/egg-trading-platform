@@ -9,14 +9,19 @@
     <el-container>
       <el-header class="header">
         <span>{{ roleLabel }}端</span>
-        <el-dropdown @command="(c: string) => c === 'logout' && onLogout()">
-          <span class="user">{{ store.realName }} ▾</span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <div class="right">
+          <el-badge :value="unread" :hidden="!unread" class="bell">
+            <el-icon :size="20" style="cursor: pointer" @click="$router.push('/message/list')"><Bell /></el-icon>
+          </el-badge>
+          <el-dropdown @command="(c: string) => c === 'logout' && onLogout()">
+            <span class="user">{{ store.realName }} ▾</span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </el-header>
       <el-main><router-view /></el-main>
     </el-container>
@@ -24,15 +29,34 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Bell } from '@element-plus/icons-vue'
+import { getUnreadCount } from '../api/biz'
 import { useUserStore } from '../store/user'
 
 const store = useUserStore()
 const router = useRouter()
 
+const unread = ref(0)
+let timer: ReturnType<typeof setInterval> | undefined
+
+async function refreshUnread() {
+  try {
+    const resp: any = await getUnreadCount()
+    unread.value = resp?.count ?? 0
+  } catch { /* 忽略未读数失败 */ }
+}
+
+onMounted(() => {
+  refreshUnread()
+  timer = setInterval(refreshUnread, 30000)  // 每30秒刷新未读数
+})
+onUnmounted(() => clearInterval(timer))
+
 const ALL_MENUS = [
   { path: '/dashboard', title: '首页', roles: ['FARM', 'CUSTOMER', 'BUSINESS', 'FINANCE', 'ADMIN'] },
+  { path: '/message/list', title: '消息中心', roles: ['FARM', 'CUSTOMER', 'BUSINESS', 'FINANCE', 'ADMIN'] },
   { path: '/enterprise/my', title: '我的企业', roles: ['FARM', 'CUSTOMER'] },
   { path: '/shelf/hall', title: '商品大厅', roles: ['CUSTOMER', 'BUSINESS'] },
   { path: '/order/list', title: '订单管理', roles: ['FARM', 'CUSTOMER', 'BUSINESS', 'FINANCE'] },
@@ -76,5 +100,7 @@ function onLogout() {
 .logo { color: #fff; text-align: center; padding: 18px 0; font-weight: bold; }
 .el-menu { border-right: none; }
 .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; }
+.right { display: flex; align-items: center; gap: 18px; }
+.bell { line-height: 1; }
 .user { cursor: pointer; color: #409eff; }
 </style>

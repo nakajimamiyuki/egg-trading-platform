@@ -10,6 +10,7 @@ const routes: RouteRecordRaw[] = [
     redirect: '/dashboard',
     children: [
       { path: 'dashboard', name: 'Dashboard', component: () => import('../views/Dashboard.vue'), meta: { title: '首页' } },
+      { path: 'message/list', component: () => import('../views/message/List.vue'), meta: { title: '消息中心' } },
       { path: 'enterprise/my', component: () => import('../views/enterprise/MyEnterprise.vue'), meta: { title: '我的企业', roles: ['FARM', 'CUSTOMER'] } },
       { path: 'enterprise/list', component: () => import('../views/enterprise/List.vue'), meta: { title: '合作方管理', roles: ['BUSINESS'] } },
       { path: 'approval/todo', component: () => import('../views/approval/Todo.vue'), meta: { title: '审批中心', roles: ['BUSINESS', 'FINANCE'] } },
