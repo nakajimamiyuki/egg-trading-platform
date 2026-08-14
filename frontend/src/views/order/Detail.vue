@@ -152,6 +152,12 @@
         <el-button type="primary" @click="onCreateOutbound">开具</el-button>
       </template>
     </el-dialog>
+    <!-- 凭证预览弹窗(页内预览, 不开新窗口) -->
+    <el-dialog v-model="showPreview" :title="previewFile?.media_type === 'PHOTO' ? '装车照片' : '装车视频'" width="640px">
+      <img v-if="previewFile?.media_type === 'PHOTO'" :src="previewFile?.url" style="width: 100%" alt="装车照片" />
+      <video v-else :src="previewFile?.url" controls style="width: 100%" />
+    </el-dialog>
+
     <!-- 登记运单对话框 -->
     <el-dialog v-model="showLogistics" title="登记运单（运满满端口就绪前人工录入）" width="460px">
       <el-form label-width="90px">
@@ -237,9 +243,13 @@ async function onConfirm(side: 'seller' | 'buyer' | 'platform') {
   load()
 }
 
+const showPreview = ref(false)
+const previewFile = ref<any>(null)
+
 function openFile(f: any) {
-  if (f.url) window.open(f.url, '_blank')
-  else ElMessage.info('文件链接不可用')
+  if (!f.url) return ElMessage.info('文件链接不可用')
+  previewFile.value = f
+  showPreview.value = true
 }
 
 async function onPhoto(e: Event) {
