@@ -57,9 +57,12 @@
       </div>
       <div class="confirms">
         <span>装车凭证：</span>
-        <el-button size="small" @click="photoInput?.click()">上传照片/视频(自动水印)</el-button>
+        <el-button v-if="canUploadVoucher" size="small" @click="photoInput?.click()">上传照片/视频(自动水印)</el-button>
         <input ref="photoInput" type="file" hidden accept="image/*,video/*" @change="onPhoto" />
-        <el-tag v-for="f in outbound.files" :key="f.file_id" size="small">{{ f.media_type === 'PHOTO' ? '照片' : '视频' }}{{ f.watermarked ? '(已水印)' : '' }}</el-tag>
+        <el-tag v-for="f in outbound.files" :key="f.file_id" size="small" class="file-tag" @click="openFile(f)">
+          {{ f.media_type === 'PHOTO' ? '照片' : '视频' }}{{ f.watermarked ? '(已水印)' : '' }} 🔍
+        </el-tag>
+        <span v-if="!outbound.files?.length" class="tip">暂无</span>
       </div>
     </el-card>
 
@@ -149,6 +152,12 @@
         <el-button type="primary" @click="onCreateOutbound">开具</el-button>
       </template>
     </el-dialog>
+    <!-- 凭证预览弹窗(页内预览, 不开新窗口) -->
+    <el-dialog v-model="showPreview" :title="previewFile?.media_type === 'PHOTO' ? '装车照片' : '装车视频'" width="640px">
+      <img v-if="previewFile?.media_type === 'PHOTO'" :src="previewFile?.url" style="width: 100%" alt="装车照片" />
+      <video v-else :src="previewFile?.url" controls style="width: 100%" />
+    </el-dialog>
+
     <!-- 登记运单对话框 -->
     <el-dialog v-model="showLogistics" title="登记运单（运满满端口就绪前人工录入）" width="460px">
       <el-form label-width="90px">
@@ -196,6 +205,8 @@ const obForm = reactive({ plate_no: '', driver_name: '', driver_phone: '' })
 const isCustomer = computed(() => store.hasRole('CUSTOMER'))
 const isFarm = computed(() => store.hasRole('FARM'))
 const isBusiness = computed(() => store.hasRole('BUSINESS'))
+// 装车凭证上传: 仅本单三方(养殖户/客户/平台业务), 财务等不显示按钮
+const canUploadVoucher = computed(() => isFarm.value || isCustomer.value || isBusiness.value)
 
 async function load() {
   order.value = await getOrderDetail(orderId)
@@ -230,6 +241,15 @@ async function onConfirm(side: 'seller' | 'buyer' | 'platform') {
   const resp: any = await confirmOutbound(outbound.value.id, side)
   ElMessage.success(resp?.message ?? '确认成功')
   load()
+}
+
+const showPreview = ref(false)
+const previewFile = ref<any>(null)
+
+function openFile(f: any) {
+  if (!f.url) return ElMessage.info('文件链接不可用')
+  previewFile.value = f
+  showPreview.value = true
 }
 
 async function onPhoto(e: Event) {
@@ -276,4 +296,5 @@ onMounted(load)
 .voucher { display: flex; gap: 20px; align-items: flex-start; }
 .scan-box { margin-top: 10px; display: flex; gap: 8px; }
 .tip { color: #909399; font-size: 13px; }
+.file-tag { cursor: pointer; }
 </style>

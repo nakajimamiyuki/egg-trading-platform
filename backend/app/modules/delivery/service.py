@@ -1,4 +1,5 @@
 """提货交付服务 (F5.1/F5.3): 出库单三方确认 + 扫码核销放行"""
+import asyncio
 from datetime import date, datetime
 
 from sqlalchemy import func, select
@@ -31,7 +32,21 @@ async def create_outbound(db: AsyncSession, order: OrderInfo, plate_no: str, dri
 
 
 async def add_outbound_file(db: AsyncSession, outbound: OutboundOrder, file_id: int, media_type: str) -> None:
-    """装车照片/视频 (水印标记; 真实水印处理在 M4 接入)"""
+    """装车照片/视频: 照片实际打水印(出库单号+时间), 失败不影响附件记录"""
+    import logging
+
+    from app.models import FileRecord
+    from app.modules.file import service as file_service
+
+    if media_type == "PHOTO":
+        try:
+            rec = await db.get(FileRecord, file_id)
+            data = await file_service.download(rec.bucket, rec.object_key)
+            text = f"{outbound.outbound_no}  {datetime.now().strftime('%Y-%m-%d %H:%M')}  EGG-PLATFORM"
+            watermarked = await asyncio.to_thread(file_service.watermark_image, data, text)
+            await file_service.reupload(rec.bucket, rec.object_key, watermarked)
+        except Exception as exc:
+            logging.getLogger(__name__).warning("照片打水印失败(原图保留): %s", exc)
     db.add(OutboundFile(outbound_id=outbound.id, file_id=file_id, media_type=media_type, watermarked=True))
 
 

@@ -122,3 +122,9 @@ export const addTrack = (logisticsId: number, address: string) =>
 export const getIncentiveList = () => request.get('/incentive/list')
 export const grantIncentive = (enterpriseId: number, promiseFileId?: number) =>
   request.post('/incentive/grant', { enterprise_id: enterpriseId, promise_file_id: promiseFileId })
+
+// ---------- 站内信 ----------
+export const getMessages = (unreadOnly = false) =>
+  request.get('/message/list', { params: unreadOnly ? { unread_only: true } : {} })
+export const getUnreadCount = () => request.get('/message/unread-count')
+export const markMessageRead = (id: number) => request.post(`/message/${id}/read`)

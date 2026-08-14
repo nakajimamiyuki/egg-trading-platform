@@ -52,6 +52,9 @@
             <el-option v-for="s in specs" :key="s.code" :label="s.name" :value="s.code" />
           </el-select>
         </el-form-item>
+        <el-form-item label="单价(元/枚)" required>
+          <el-input-number v-model="dwForm.price" :min="0.01" :precision="2" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDw = false">取消</el-button>
@@ -80,7 +83,7 @@ const showDw = ref(false)
 const current = ref<any>(null)
 const deviceTarget = ref<any>(null)
 const rentAmount = ref(8000)
-const dwForm = reactive({ quantity: 1000, grade: 'A', spec: 'S50' })
+const dwForm = reactive({ quantity: 1000, grade: 'A', spec: 'S50', price: 5.5 })
 const grades = ref<any[]>([])
 const specs = ref<any[]>([])
 

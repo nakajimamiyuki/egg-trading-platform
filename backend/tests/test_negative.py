@@ -86,3 +86,41 @@ async def test_m3_requires_risk_survey(client):
                              json={"shelf_item_id": ctx["shelf_item_id"], "quantity": 100,
                                    "sale_mode": "M3", "credit_days": 60})
     assert resp.json()["code"] == 400 and "尽调" in resp.json()["message"]
+
+
+async def test_outbound_file_upload_permission(client):
+    """装车凭证上传: 财务等非现场角色被拒, 三方人员可传"""
+    import io
+
+    ctx = await setup_shelf(client, "neg8")
+    order_id, order_no = await create_order(client, ctx["buyer"], ctx["shelf_item_id"], 100)
+    await approve_todo(client, ctx["biz"], f"订单审核: {order_no}")
+    await client.post(f"{API}/finance/pay", headers=auth(ctx["buyer"]),
+                      json={"order_id": order_id, "pay_type": "DEPOSIT"})
+    await approve_todo(client, ctx["fin"], f"垫资审批(80%): {order_no}")
+    resp = await client.post(f"{API}/delivery/outbound", headers=auth(ctx["biz"]),
+                             json={"order_id": order_id, "plate_no": "豫A00001",
+                                   "driver_name": "王五", "driver_phone": "13700000000"})
+    ob_id = resp.json()["data"]["id"]
+
+    async def upload_jpg(token):
+        resp = await client.post(f"{API}/file/upload?biz_type=OUTBOUND_PHOTO", headers=auth(token),
+                                 files={"file": ("p.jpg", io.BytesIO(b"\xff\xd8\xff"), "image/jpeg")})
+        return resp.json()["data"]["file_id"]
+
+    # 财务上传附件 → 403
+    fin_file = await upload_jpg(ctx["fin"])
+    resp = await client.post(f"{API}/delivery/outbound/{ob_id}/files", headers=auth(ctx["fin"]),
+                             json={"file_id": fin_file, "media_type": "PHOTO"})
+    assert resp.json()["code"] == 403
+
+    # 养殖户(卖方)上传 → 允许
+    farm_file = await upload_jpg(ctx["farm"])
+    resp = await client.post(f"{API}/delivery/outbound/{ob_id}/files", headers=auth(ctx["farm"]),
+                             json={"file_id": farm_file, "media_type": "PHOTO"})
+    assert resp.json()["code"] == 0
+
+    # 附件带回可访问的 url
+    resp = await client.get(f"{API}/delivery/outbound/by-order/{order_id}", headers=auth(ctx["farm"]))
+    files = resp.json()["data"]["files"]
+    assert files and files[0]["url"] and files[0]["url"].startswith("http")
