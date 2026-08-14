@@ -54,19 +54,40 @@ async def create_outbound(req: OutboundCreate, ctx=Depends(require_roles("BUSINE
 
 @router.get("/outbound/by-order/{order_id}")
 async def get_outbound(order_id: int, ctx=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from app.models import FileRecord
+    from app.modules.file.service import presigned_url
+
     ob = await db.scalar(select(OutboundOrder).where(OutboundOrder.order_id == order_id, OutboundOrder.deleted == False))  # noqa: E712
     if not ob:
         return ok(None)
     files = await db.scalars(select(OutboundFile).where(OutboundFile.outbound_id == ob.id, OutboundFile.deleted == False))  # noqa: E712
-    return ok(_ob_dict(ob, [{"file_id": f.file_id, "media_type": f.media_type, "watermarked": f.watermarked} for f in files.all()]))
+    file_list = []
+    for f in files.all():
+        item = {"file_id": f.file_id, "media_type": f.media_type, "watermarked": f.watermarked, "url": None}
+        rec = await db.get(FileRecord, f.file_id)
+        if rec and not rec.deleted:
+            item["url"] = await presigned_url(rec.bucket, rec.object_key)
+            item["file_name"] = rec.file_name
+        file_list.append(item)
+    return ok(_ob_dict(ob, file_list))
 
 
 @router.post("/outbound/{outbound_id}/files")
 async def add_file(outbound_id: int, req: OutboundFileAdd, ctx=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """上传装车照片/视频 (带水印)"""
+    """上传装车照片/视频 (带水印)。
+    权限: 仅本单三方现场人员——卖方养殖户/买方客户/平台业务(管理员)"""
+    user, roles = ctx
     ob = await db.get(OutboundOrder, outbound_id)
     if not ob or ob.deleted:
         raise BizError("出库单不存在", code=404)
+    order = await db.get(OrderInfo, ob.order_id)
+    involved = (
+        "BUSINESS" in roles or "ADMIN" in roles
+        or ("FARM" in roles and order.seller_id == user.enterprise_id)
+        or ("CUSTOMER" in roles and order.buyer_id == user.enterprise_id)
+    )
+    if not involved:
+        raise BizError("只有本单的养殖户/客户/平台业务可以上传装车凭证", code=403)
     await delivery_service.add_outbound_file(db, ob, req.file_id, req.media_type)
     await db.commit()
     return ok(message="附件已添加(已加水印)")

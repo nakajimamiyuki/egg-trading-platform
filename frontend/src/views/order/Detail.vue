@@ -57,9 +57,12 @@
       </div>
       <div class="confirms">
         <span>装车凭证：</span>
-        <el-button size="small" @click="photoInput?.click()">上传照片/视频(自动水印)</el-button>
+        <el-button v-if="canUploadVoucher" size="small" @click="photoInput?.click()">上传照片/视频(自动水印)</el-button>
         <input ref="photoInput" type="file" hidden accept="image/*,video/*" @change="onPhoto" />
-        <el-tag v-for="f in outbound.files" :key="f.file_id" size="small">{{ f.media_type === 'PHOTO' ? '照片' : '视频' }}{{ f.watermarked ? '(已水印)' : '' }}</el-tag>
+        <el-tag v-for="f in outbound.files" :key="f.file_id" size="small" class="file-tag" @click="openFile(f)">
+          {{ f.media_type === 'PHOTO' ? '照片' : '视频' }}{{ f.watermarked ? '(已水印)' : '' }} 🔍
+        </el-tag>
+        <span v-if="!outbound.files?.length" class="tip">暂无</span>
       </div>
     </el-card>
 
@@ -196,6 +199,8 @@ const obForm = reactive({ plate_no: '', driver_name: '', driver_phone: '' })
 const isCustomer = computed(() => store.hasRole('CUSTOMER'))
 const isFarm = computed(() => store.hasRole('FARM'))
 const isBusiness = computed(() => store.hasRole('BUSINESS'))
+// 装车凭证上传: 仅本单三方(养殖户/客户/平台业务), 财务等不显示按钮
+const canUploadVoucher = computed(() => isFarm.value || isCustomer.value || isBusiness.value)
 
 async function load() {
   order.value = await getOrderDetail(orderId)
@@ -230,6 +235,11 @@ async function onConfirm(side: 'seller' | 'buyer' | 'platform') {
   const resp: any = await confirmOutbound(outbound.value.id, side)
   ElMessage.success(resp?.message ?? '确认成功')
   load()
+}
+
+function openFile(f: any) {
+  if (f.url) window.open(f.url, '_blank')
+  else ElMessage.info('文件链接不可用')
 }
 
 async function onPhoto(e: Event) {
@@ -276,4 +286,5 @@ onMounted(load)
 .voucher { display: flex; gap: 20px; align-items: flex-start; }
 .scan-box { margin-top: 10px; display: flex; gap: 8px; }
 .tip { color: #909399; font-size: 13px; }
+.file-tag { cursor: pointer; }
 </style>
